@@ -497,7 +497,7 @@ export function renderHTML(report) {
     <div class="branding">
       <div>
         <div class="brand-name">CC Hubber</div>
-        <div class="brand-sub">github.com/asmirkn/cchubber</div>
+        <div class="brand-sub">github.com/azkhh/cchubber</div>
       </div>
       <a href="https://moveros.dev" target="_blank" class="brand-sub" style="color:var(--text-dim);text-decoration:none;">Shipped with <span style="color:var(--accent)">Mover OS</span> at speed</a>
     </div>
@@ -663,7 +663,7 @@ export function renderHTML(report) {
 
   <!-- Footer -->
   <div class="footer">
-    <div>CC Hubber v0.1.0 — <a href="https://github.com/asmirkn/cchubber" target="_blank">github.com/asmirkn/cchubber</a></div>
+    <div>CC Hubber v0.1.0 — <a href="https://github.com/azkhh/cchubber" target="_blank">github.com/azkhh/cchubber</a></div>
     <a href="https://moveros.dev" target="_blank" class="mover-badge">
       Shipped with <strong style="color:var(--accent)">Mover OS</strong> at speed
     </a>

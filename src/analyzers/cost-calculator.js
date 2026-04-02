@@ -1,28 +1,80 @@
-// Pricing tiers from Claude Code source (per million tokens)
-const PRICING = {
-  // Opus 4.5/4.6 standard
+import https from 'https';
+
+// Fallback pricing — used when LiteLLM fetch fails (per million tokens)
+const FALLBACK_PRICING = {
   'claude-opus-4-6': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.50 },
   'claude-opus-4-5-20251101': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.50 },
-  // Sonnet 4.5/4.6
   'claude-sonnet-4-6': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 },
   'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 },
   'claude-sonnet-4-20250514': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 },
-  // Haiku 4.5
   'claude-haiku-4-5-20251001': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.10 },
-  // Fallback
   'default': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.50 },
 };
 
-function getPricing(modelName) {
-  // Try exact match first, then prefix match
-  if (PRICING[modelName]) return PRICING[modelName];
-  for (const [key, value] of Object.entries(PRICING)) {
-    if (modelName.includes(key.replace('claude-', '').split('-')[0])) return value;
+// Dynamic pricing cache (populated by fetchPricing)
+let dynamicPricing = null;
+
+/**
+ * Fetch latest pricing from LiteLLM. Returns map of model -> pricing.
+ * Falls back to hardcoded pricing on failure.
+ */
+export async function fetchPricing() {
+  if (dynamicPricing) return dynamicPricing;
+
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const req = https.get('https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json', (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); } catch { reject(new Error('Bad JSON')); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
+    });
+
+    // Parse LiteLLM format into our format
+    const pricing = {};
+    for (const [key, info] of Object.entries(data)) {
+      if (!key.startsWith('claude') && !key.includes('claude')) continue;
+
+      // LiteLLM uses per-token pricing, we use per-million
+      const inputPerM = (info.input_cost_per_token || 0) * 1_000_000;
+      const outputPerM = (info.output_cost_per_token || 0) * 1_000_000;
+      const cacheReadPerM = (info.cache_read_input_token_cost || 0) * 1_000_000;
+      const cacheWritePerM = (info.cache_creation_input_token_cost || 0) * 1_000_000;
+
+      if (inputPerM > 0) {
+        pricing[key] = { input: inputPerM, output: outputPerM, cacheWrite: cacheWritePerM || inputPerM * 1.25, cacheRead: cacheReadPerM || inputPerM * 0.1 };
+      }
+    }
+
+    if (Object.keys(pricing).length > 0) {
+      dynamicPricing = pricing;
+      return pricing;
+    }
+  } catch {
+    // Fall through to fallback
   }
+
+  dynamicPricing = FALLBACK_PRICING;
+  return FALLBACK_PRICING;
+}
+
+const PRICING = FALLBACK_PRICING; // Sync access for calculateCost
+
+function getPricing(modelName) {
+  const source = dynamicPricing || PRICING;
+  // Try exact match
+  if (source[modelName]) return source[modelName];
+  // Try with/without claude/ prefix (LiteLLM uses "claude/claude-opus-4-6" format)
+  const altKey = 'claude/' + modelName;
+  if (source[altKey]) return source[altKey];
   // Infer from name
-  if (modelName.includes('haiku')) return PRICING['claude-haiku-4-5-20251001'];
-  if (modelName.includes('sonnet')) return PRICING['claude-sonnet-4-6'];
-  if (modelName.includes('opus')) return PRICING['claude-opus-4-6'];
+  if (modelName.includes('haiku')) return source['claude-haiku-4-5-20251001'] || PRICING['claude-haiku-4-5-20251001'];
+  if (modelName.includes('sonnet')) return source['claude-sonnet-4-6'] || PRICING['claude-sonnet-4-6'];
+  if (modelName.includes('opus')) return source['claude-opus-4-6'] || PRICING['claude-opus-4-6'];
   return PRICING['default'];
 }
 

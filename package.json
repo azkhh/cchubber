@@ -20,11 +20,11 @@
     "cache",
     "analytics"
   ],
-  "author": "Asmir Khan (@asmirkn)",
+  "author": "Asmir Khan (@azkhh)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/asmirkn/cchubber"
+    "url": "https://github.com/azkhh/cchubber"
   },
   "engines": {
     "node": ">=18.0.0"

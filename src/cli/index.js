@@ -11,7 +11,7 @@ import { readSessionMeta } from '../readers/session-meta.js';
 import { readCacheBreaks } from '../readers/cache-breaks.js';
 import { readClaudeMdStack } from '../readers/claude-md.js';
 import { readOAuthUsage } from '../readers/oauth-usage.js';
-import { analyzeUsage } from '../analyzers/cost-calculator.js';
+import { analyzeUsage, fetchPricing } from '../analyzers/cost-calculator.js';
 import { analyzeCacheHealth } from '../analyzers/cache-health.js';
 import { detectAnomalies } from '../analyzers/anomaly-detector.js';
 import { generateRecommendations } from '../analyzers/recommendations.js';
@@ -92,8 +92,13 @@ async function main() {
   const dailyFromJSONL = aggregateDaily(jsonlEntries);
   const modelFromJSONL = aggregateByModel(jsonlEntries);
 
+  // Fetch dynamic pricing (LiteLLM) with hardcoded fallback
+  const pricing = await fetchPricing();
+  const pricingSource = pricing === null ? 'hardcoded' : 'LiteLLM';
+
   console.log(`  ✓ ${jsonlEntries.length.toLocaleString()} conversation entries parsed`);
   console.log(`  ✓ ${dailyFromJSONL.length} days of data found`);
+  console.log(`  ✓ Pricing: ${pricingSource}`);
   console.log(`  ✓ ${sessionMeta.length} sessions found`);
   console.log(`  ✓ ${cacheBreaks.length} cache break events found`);
   console.log(`  ✓ CLAUDE.md stack: ${claudeMdStack.totalTokensEstimate.toLocaleString()} tokens (~${(claudeMdStack.totalBytes / 1024).toFixed(1)} KB)`);
