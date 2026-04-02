@@ -35,48 +35,68 @@ function readProjectsDir(dir, entries) {
 
     for (const hash of projectHashes) {
       const projectDir = join(dir, hash);
+
+      // 1. Read top-level JSONL files (one per session)
       const jsonlFiles = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
-
       for (const file of jsonlFiles) {
-        const sessionId = basename(file, '.jsonl');
-        const filePath = join(projectDir, file);
+        readJsonlFile(join(projectDir, file), basename(file, '.jsonl'), hash, entries);
+      }
 
-        try {
-          const raw = readFileSync(filePath, 'utf-8');
-          const lines = raw.split('\n').filter(l => l.trim());
+      // 2. Read subagent JSONL files inside session UUID directories
+      // Structure: <project_hash>/<session_uuid>/subagents/agent-*.jsonl
+      const subdirs = readdirSync(projectDir).filter(f => {
+        try { return statSync(join(projectDir, f)).isDirectory(); } catch { return false; }
+      });
 
-          for (const line of lines) {
-            try {
-              const record = JSON.parse(line);
-
-              // Only assistant messages have token usage
-              if (record.type !== 'assistant') continue;
-
-              const usage = record.message?.usage;
-              if (!usage) continue;
-
-              entries.push({
-                sessionId,
-                projectHash: hash,
-                timestamp: record.timestamp || '',
-                model: record.message?.model || 'unknown',
-                inputTokens: usage.input_tokens || 0,
-                outputTokens: usage.output_tokens || 0,
-                cacheCreationTokens: usage.cache_creation_input_tokens || 0,
-                cacheReadTokens: usage.cache_read_input_tokens || 0,
-                costUSD: record.costUSD || 0, // Pre-calculated by Claude Code
-              });
-            } catch {
-              // Skip malformed lines
+      for (const subdir of subdirs) {
+        const subagentDir = join(projectDir, subdir, 'subagents');
+        if (existsSync(subagentDir)) {
+          try {
+            const subFiles = readdirSync(subagentDir).filter(f => f.endsWith('.jsonl'));
+            for (const file of subFiles) {
+              readJsonlFile(join(subagentDir, file), basename(file, '.jsonl'), hash, entries);
             }
-          }
-        } catch {
-          // Skip unreadable files
+          } catch { /* skip */ }
         }
       }
     }
   } catch {
     // Directory read failed
+  }
+}
+
+function readJsonlFile(filePath, sessionId, projectHash, entries) {
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const lines = raw.split('\n').filter(l => l.trim());
+
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+
+        // Only assistant messages have token usage
+        if (record.type !== 'assistant') continue;
+
+        const usage = record.message?.usage;
+        if (!usage) continue;
+
+        entries.push({
+          sessionId,
+          projectHash,
+          timestamp: record.timestamp || '',
+          model: record.message?.model || 'unknown',
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreationTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadTokens: usage.cache_read_input_tokens || 0,
+          costUSD: record.costUSD || 0,
+        });
+      } catch {
+        // Skip malformed lines
+      }
+    }
+  } catch {
+    // Skip unreadable files
   }
 }
 
