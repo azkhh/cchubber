@@ -203,7 +203,7 @@ export function renderHTML(report) {
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     @keyframes float{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
     .cc-card{
-      position:relative;width:100%;max-width:680px;aspect-ratio:1.586;
+      position:relative;width:100%;max-width:640px;
       border-radius:20px;overflow:hidden;
       background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
       box-shadow:0 20px 60px -15px rgba(0,0,0,0.7),0 0 0 1px rgba(192,193,255,0.06);
@@ -222,7 +222,7 @@ export function renderHTML(report) {
       background:radial-gradient(circle,rgba(192,193,255,0.06) 0%,transparent 60%);
       pointer-events:none;z-index:1;
     }
-    .cc-inner{position:relative;z-index:3;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;}
+    .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:28px;padding:32px 36px;}
   </style>
   <div class="cc-card" id="share-card">
     <div class="cc-inner">
@@ -807,10 +807,10 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       var w=staticCanvas.width,h=staticCanvas.height;
       var anim=document.createElement('canvas');anim.width=w;anim.height=h;
       var ctx=anim.getContext('2d');
-      var stream=anim.captureStream(30);
+      var stream=anim.captureStream(0); // manual frame push
       var chunks=[];
       var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:5000000});
+      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:8000000});
       recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
       recorder.onstop=function(){
         var blob=new Blob(chunks,{type:'video/webm'});
@@ -820,34 +820,53 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         gb.disabled=false;showToast('Video saved');
       };
 
-      var frame=0,total=90; // 3 sec at 30fps
-      recorder.start();
-
-      function draw(){
-        if(frame>=total){recorder.stop();return}
-        var t=frame/total;
-        ctx.drawImage(staticCanvas,0,0);
-        // Shimmer sweep
-        var sx=-w*0.4+t*w*1.8;
-        var g=ctx.createLinearGradient(sx,0,sx+w*0.4,h);
-        g.addColorStop(0,'rgba(192,193,255,0)');
-        g.addColorStop(0.45,'rgba(192,193,255,0.07)');
-        g.addColorStop(0.5,'rgba(255,255,255,0.1)');
-        g.addColorStop(0.55,'rgba(212,187,255,0.07)');
-        g.addColorStop(1,'rgba(192,193,255,0)');
-        // Clip rounded
-        var r=20*3;
-        ctx.save();ctx.beginPath();
+      var r=20*3;
+      function roundClip(){
+        ctx.beginPath();
         ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
         ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);ctx.lineTo(r,h);
         ctx.quadraticCurveTo(0,h,0,h-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
         ctx.closePath();ctx.clip();
-        ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
-        ctx.restore();
-        frame++;
-        requestAnimationFrame(draw);
       }
-      draw();
+
+      var duration=3000; // 3 seconds
+      var fps=30;
+      var interval=1000/fps;
+      var frame=0;
+      var totalFrames=Math.floor(duration/interval);
+
+      recorder.start(100); // collect data every 100ms
+
+      var timer=setInterval(function(){
+        var t=frame/totalFrames;
+
+        // Base card
+        ctx.save();
+        roundClip();
+        ctx.drawImage(staticCanvas,0,0);
+
+        // Shimmer sweep across the card
+        var shimmerPos=-w*0.5+t*w*2;
+        var g=ctx.createLinearGradient(shimmerPos,0,shimmerPos+w*0.35,h);
+        g.addColorStop(0,'rgba(192,193,255,0)');
+        g.addColorStop(0.4,'rgba(192,193,255,0.06)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.12)');
+        g.addColorStop(0.6,'rgba(212,187,255,0.06)');
+        g.addColorStop(1,'rgba(192,193,255,0)');
+        ctx.fillStyle=g;
+        ctx.fillRect(0,0,w,h);
+        ctx.restore();
+
+        // Push frame to stream
+        try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
+
+        frame++;
+        if(frame>=totalFrames){
+          clearInterval(timer);
+          setTimeout(function(){recorder.stop()},200);
+        }
+      },interval);
+
     }).catch(function(){
       gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
       gb.disabled=false;showToast('Failed');
