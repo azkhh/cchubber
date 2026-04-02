@@ -1,0 +1,35 @@
+{
+  "name": "cchubber",
+  "version": "0.1.0",
+  "description": "What you spent. Why you spent it. Is that normal. — Claude Code usage diagnosis with beautiful HTML reports.",
+  "type": "module",
+  "bin": {
+    "cchubber": "./src/cli/index.js"
+  },
+  "scripts": {
+    "start": "node src/cli/index.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "usage",
+    "tokens",
+    "cost",
+    "diagnosis",
+    "cache",
+    "analytics"
+  ],
+  "author": "Asmir Khan (@asmirkn)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/asmirkn/cchubber"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "src/**/*"
+  ]
+}
