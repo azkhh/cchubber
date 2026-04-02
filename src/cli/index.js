@@ -105,16 +105,18 @@ async function main() {
   if (oauthUsage) console.log('  ✓ Live rate limits loaded');
   else console.log('  ○ Live rate limits skipped (no OAuth token)');
 
-  // Analyze — use JSONL aggregations as primary data, stats-cache as fallback
+  // Analyze — use ALL data for the HTML (client-side JS handles filtering)
+  // The --days flag sets the default view, but all data is embedded
   console.log('\n  Analyzing...\n');
-  const costAnalysis = analyzeUsage(statsCache, sessionMeta, flags.days, dailyFromJSONL, modelFromJSONL);
-  const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, flags.days, dailyFromJSONL);
+  const allTimeDays = 99999; // Pass everything to the report
+  const costAnalysis = analyzeUsage(statsCache, sessionMeta, allTimeDays, dailyFromJSONL, modelFromJSONL);
+  const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, allTimeDays, dailyFromJSONL);
   const anomalies = detectAnomalies(costAnalysis);
   const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies);
 
   const report = {
     generatedAt: new Date().toISOString(),
-    periodDays: flags.days,
+    periodDays: flags.days, // Default view in HTML
     costAnalysis,
     cacheHealth,
     anomalies,
