@@ -206,7 +206,7 @@ export function renderHTML(report) {
       position:relative;width:100%;max-width:680px;aspect-ratio:1.586;
       border-radius:20px;overflow:hidden;
       background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
-      box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(192,193,255,0.1),0 60px 100px -30px rgba(0,0,0,0.9),0 0 60px -10px rgba(192,193,255,0.04);
+      box-shadow:0 20px 60px -15px rgba(0,0,0,0.7),0 0 0 1px rgba(192,193,255,0.06);
       animation:float 6s ease-in-out infinite;
       cursor:default;
     }
@@ -238,7 +238,7 @@ export function renderHTML(report) {
           </div>
         </div>
         <div class="text-right">
-          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block">CC Hubber</span>
+          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block" id="card-range">All time</span>
         </div>
       </div>
 
@@ -258,10 +258,10 @@ export function renderHTML(report) {
         </div>
       </div>
 
-      <!-- Bottom: Diagnosis + branding line -->
-      <div>
-        <p class="text-[11px] text-[#908fa0] mb-4">${diagnosisLine}</p>
-        <div class="flex items-center gap-2 text-[11px] font-mono tracking-[0.04em]">
+      <!-- Bottom: Diagnosis left, branding right -->
+      <div class="flex justify-between items-end">
+        <p class="text-[11px] text-[#908fa0]">${diagnosisLine}</p>
+        <div class="flex items-center gap-2 text-[10px] font-mono tracking-[0.04em] shrink-0">
           <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff] transition-colors" style="text-decoration:none;">CC Hubber</a>
           <span class="text-[#464554]">&middot;</span>
           <span class="text-[#908fa0]">shipped fast with</span>
@@ -726,6 +726,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     var ci=document.getElementById('chart-info');
     if(ci&&f.length){var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;ci.textContent=a+' days \u00b7 '+fc(t)}
     var rl=document.getElementById('range-lbl');if(rl)rl.textContent=RL[r]||'All time';
+    var cr=document.getElementById('card-range');if(cr)cr.textContent=RL[r]||'All time';
     if(f.length){
       var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;
       var hc=document.getElementById('h-cost'),hd=document.getElementById('h-days');
@@ -752,21 +753,20 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   function captureCard(){
     var card=document.getElementById('share-card');
     if(!card||typeof html2canvas==='undefined')return Promise.reject();
-    // Pause animation for clean capture
+    // Pause animation, flatten transform
     card.style.animation='none';
-    card.style.transform='perspective(800px) rotateY(0deg) rotateX(0deg)';
-    return html2canvas(card,{backgroundColor:'#0f1018',scale:2,useCORS:true,logging:false,borderRadius:20}).then(function(c){
+    card.style.transform='none';
+    var w=card.offsetWidth,h=card.offsetHeight;
+    return html2canvas(card,{
+      backgroundColor:'#0f1018',
+      scale:2,
+      useCORS:true,
+      logging:false,
+      width:w,
+      height:h,
+      windowWidth:w+100,
+    }).then(function(c){
       card.style.animation='';card.style.transform='';
-      // Draw rounded corners onto canvas
-      var w=c.width,h=c.height,r=40; // 20px * scale 2
-      var ctx=c.getContext('2d');
-      ctx.globalCompositeOperation='destination-in';
-      ctx.beginPath();
-      ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
-      ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);
-      ctx.lineTo(r,h);ctx.quadraticCurveTo(0,h,0,h-r);
-      ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-      ctx.fill();ctx.globalCompositeOperation='source-over';
       return c;
     });
   }
@@ -795,7 +795,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
     // Capture multiple frames with shimmer at different positions
     var gif=new GIF({workers:2,quality:8,width:0,height:0,workerScript:'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'});
-    var totalFrames=20;var frameDelay=100;var frameIdx=0;
+    var totalFrames=10;var frameDelay=120;var frameIdx=0;
 
     function captureFrame(){
       if(frameIdx>=totalFrames){
@@ -811,14 +811,9 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       card.style.animation='none';
       card.style.transform='perspective(800px) rotateY('+(Math.sin(frameIdx/totalFrames*Math.PI*2)*3)+'deg) rotateX('+(Math.cos(frameIdx/totalFrames*Math.PI*2)*1.5)+'deg)';
 
-      html2canvas(card,{backgroundColor:'#0f1018',scale:1.5,useCORS:true,logging:false}).then(function(c){
-        // Round corners
-        var w=c.width,h=c.height,r=30;
-        var ctx=c.getContext('2d');
-        ctx.globalCompositeOperation='destination-in';
-        ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
-        ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);ctx.lineTo(r,h);ctx.quadraticCurveTo(0,h,0,h-r);
-        ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);ctx.fill();ctx.globalCompositeOperation='source-over';
+      var cw=card.offsetWidth,ch=card.offsetHeight;
+      html2canvas(card,{backgroundColor:'#0f1018',scale:1,useCORS:true,logging:false,width:cw,height:ch,windowWidth:cw+100}).then(function(c){
+        // Skip rounded corners for GIF (encoding handles it)
 
         if(frameIdx===0){gif.options.width=w;gif.options.height=h}
         gif.addFrame(c,{delay:frameDelay,copy:true});
