@@ -49,8 +49,8 @@ export function analyzeCacheHealth(statsCache, cacheBreaks, days, dailyFromJSONL
   // Cache efficiency ratio: cache reads per output token (lower = more efficient)
   const efficiencyRatio = totalOutput > 0 ? Math.round(totalCacheRead / totalOutput) : 0;
 
-  // Grade calculation
-  const grade = calculateGrade(efficiencyRatio, totalBreaks, days);
+  // Trend-weighted grade: recent 7 days count 3x more than older days
+  const grade = calculateGrade(efficiencyRatio, totalBreaks, days, dailyFromJSONL);
 
   // Estimated cost savings from caching
   // Without cache: all cache reads would be standard input ($5/M for Opus)
@@ -81,15 +81,45 @@ export function analyzeCacheHealth(statsCache, cacheBreaks, days, dailyFromJSONL
   };
 }
 
-function calculateGrade(ratio, breaks, days) {
-  // Grade based on efficiency ratio + break frequency
+function calculateGrade(allTimeRatio, breaks, days, dailyFromJSONL) {
+  // Trend-weighted scoring: recent 7 days dominate the grade.
+  // A user with great all-time stats but a recent cache bug spike should get D/F.
   let score = 100;
 
-  // Penalize high cache:output ratio
-  if (ratio > 3000) score -= 40;
-  else if (ratio > 2000) score -= 30;
-  else if (ratio > 1000) score -= 20;
-  else if (ratio > 500) score -= 10;
+  // Compute recent 7-day ratio from daily data
+  let recentRatio = allTimeRatio;
+  let olderRatio = allTimeRatio;
+
+  if (dailyFromJSONL && dailyFromJSONL.length > 0) {
+    const sorted = [...dailyFromJSONL].sort((a, b) => a.date.localeCompare(b.date));
+    const recent = sorted.slice(-7);
+    const older = sorted.slice(0, -7);
+
+    const recentOutput = recent.reduce((s, d) => s + (d.outputTokens || 0), 0);
+    const recentCacheRead = recent.reduce((s, d) => s + (d.cacheReadTokens || 0), 0);
+    recentRatio = recentOutput > 0 ? Math.round(recentCacheRead / recentOutput) : 0;
+
+    const olderOutput = older.reduce((s, d) => s + (d.outputTokens || 0), 0);
+    const olderCacheRead = older.reduce((s, d) => s + (d.cacheReadTokens || 0), 0);
+    olderRatio = olderOutput > 0 ? Math.round(olderCacheRead / olderOutput) : 0;
+  }
+
+  // Weighted ratio: 70% recent, 30% older (recent dominates)
+  const weightedRatio = dailyFromJSONL && dailyFromJSONL.length >= 7
+    ? Math.round(recentRatio * 0.7 + olderRatio * 0.3)
+    : allTimeRatio;
+
+  // Penalize based on weighted ratio
+  if (weightedRatio > 3000) score -= 45;
+  else if (weightedRatio > 2000) score -= 35;
+  else if (weightedRatio > 1500) score -= 28;
+  else if (weightedRatio > 1000) score -= 20;
+  else if (weightedRatio > 500) score -= 10;
+
+  // Extra penalty if recent is sharply worse than older (deterioration signal)
+  if (olderRatio > 0 && recentRatio > olderRatio * 2) {
+    score -= 15; // Recent degradation penalty
+  }
 
   // Penalize high break frequency
   const breaksPerDay = days > 0 ? breaks / days : 0;

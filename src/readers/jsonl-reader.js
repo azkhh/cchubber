@@ -178,6 +178,67 @@ export function aggregateByModel(entries) {
   return byModel;
 }
 
+/**
+ * Aggregate entries into per-project totals.
+ * Uses the project directory hash — resolves to real path where possible.
+ */
+export function aggregateByProject(entries, claudeDir) {
+  const byProject = {};
+
+  for (const entry of entries) {
+    const hash = entry.projectHash || 'unknown';
+    if (!byProject[hash]) {
+      byProject[hash] = {
+        hash,
+        path: null,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+        messageCount: 0,
+        sessionCount: 0,
+        sessions: new Set(),
+        firstSeen: entry.timestamp,
+        lastSeen: entry.timestamp,
+      };
+    }
+    const p = byProject[hash];
+    p.inputTokens += entry.inputTokens;
+    p.outputTokens += entry.outputTokens;
+    p.cacheCreationTokens += entry.cacheCreationTokens;
+    p.cacheReadTokens += entry.cacheReadTokens;
+    p.messageCount++;
+    p.sessions.add(entry.sessionId);
+    if (entry.timestamp > p.lastSeen) p.lastSeen = entry.timestamp;
+    if (entry.timestamp < p.firstSeen) p.firstSeen = entry.timestamp;
+  }
+
+  // Resolve project paths from .claude/projects/<hash>/.project_path if available
+  const projectsDir = join(claudeDir, 'projects');
+  for (const proj of Object.values(byProject)) {
+    proj.sessionCount = proj.sessions.size;
+    delete proj.sessions;
+
+    // Try to read the project path file
+    try {
+      const pathFile = join(projectsDir, proj.hash, '.project_path');
+      if (existsSync(pathFile)) {
+        const raw = readFileSync(pathFile, 'utf-8').trim();
+        proj.path = raw;
+        // Use last directory segment as display name
+        proj.name = raw.split(/[/\\]/).filter(Boolean).pop() || proj.hash.slice(0, 8);
+      } else {
+        proj.name = proj.hash.slice(0, 8);
+      }
+    } catch {
+      proj.name = proj.hash.slice(0, 8);
+    }
+  }
+
+  return Object.values(byProject)
+    .sort((a, b) => b.messageCount - a.messageCount);
+}
+
 function cleanModelName(name) {
   return (name || 'unknown')
     .replace('claude-', '')

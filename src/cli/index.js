@@ -5,7 +5,7 @@ import { existsSync, writeFileSync } from 'fs';
 import { homedir, platform } from 'os';
 import { exec } from 'child_process';
 
-import { readAllJSONL, aggregateDaily, aggregateByModel } from '../readers/jsonl-reader.js';
+import { readAllJSONL, aggregateDaily, aggregateByModel, aggregateByProject } from '../readers/jsonl-reader.js';
 import { readStatsCache } from '../readers/stats-cache.js';
 import { readSessionMeta } from '../readers/session-meta.js';
 import { readCacheBreaks } from '../readers/cache-breaks.js';
@@ -15,6 +15,7 @@ import { analyzeUsage, fetchPricing } from '../analyzers/cost-calculator.js';
 import { analyzeCacheHealth } from '../analyzers/cache-health.js';
 import { detectAnomalies } from '../analyzers/anomaly-detector.js';
 import { generateRecommendations } from '../analyzers/recommendations.js';
+import { detectInflectionPoints } from '../analyzers/inflection-detector.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
 
@@ -88,9 +89,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Aggregate JSONL into daily + model views (primary data source)
+  // Aggregate JSONL into daily + model + project views (primary data source)
   const dailyFromJSONL = aggregateDaily(jsonlEntries);
   const modelFromJSONL = aggregateByModel(jsonlEntries);
+  const projectBreakdown = aggregateByProject(jsonlEntries, claudeDir);
 
   // Fetch dynamic pricing (LiteLLM) with hardcoded fallback
   const pricing = await fetchPricing();
@@ -112,7 +114,14 @@ async function main() {
   const costAnalysis = analyzeUsage(statsCache, sessionMeta, allTimeDays, dailyFromJSONL, modelFromJSONL);
   const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, allTimeDays, dailyFromJSONL);
   const anomalies = detectAnomalies(costAnalysis);
-  const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies);
+  const inflection = detectInflectionPoints(dailyFromJSONL);
+  const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection);
+
+  if (inflection) {
+    console.log(`  ✓ Inflection point: ${inflection.summary}`);
+  }
+
+  console.log(`  ✓ ${projectBreakdown.length} projects detected`);
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -120,6 +129,8 @@ async function main() {
     costAnalysis,
     cacheHealth,
     anomalies,
+    inflection,
+    projectBreakdown,
     claudeMdStack,
     oauthUsage,
     recommendations,

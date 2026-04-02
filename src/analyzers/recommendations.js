@@ -1,5 +1,22 @@
-export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies) {
+export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection) {
   const recs = [];
+
+  // 0. Inflection point — most important signal, goes first
+  if (inflection && inflection.direction === 'worsened' && inflection.multiplier >= 2) {
+    recs.push({
+      severity: 'critical',
+      title: `Efficiency dropped ${inflection.multiplier}x on ${inflection.date}`,
+      detail: inflection.summary,
+      action: 'This date likely correlates with a Claude Code update or cache regression. Check your CC version history. v2.1.89 had a known cache bug — v2.1.90 includes a fix.',
+    });
+  } else if (inflection && inflection.direction === 'improved' && inflection.multiplier >= 2) {
+    recs.push({
+      severity: 'positive',
+      title: `Efficiency improved ${inflection.multiplier}x on ${inflection.date}`,
+      detail: inflection.summary,
+      action: 'Something changed for the better on this date. Likely a version update or workflow change.',
+    });
+  }
 
   // 1. CLAUDE.md size
   if (claudeMdStack.totalTokensEstimate > 8000) {
@@ -86,7 +103,18 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     });
   }
 
-  // 7. Caching savings acknowledgment
+  // 7. Session depth — long sessions without compact
+  const sessions = costAnalysis.sessions || {};
+  if (sessions.avgDurationMinutes > 60) {
+    recs.push({
+      severity: 'warning',
+      title: `Average session: ${Math.round(sessions.avgDurationMinutes)} minutes`,
+      detail: `Long sessions accumulate context that degrades both performance and cache efficiency. Sessions over 60 minutes often benefit from /compact.`,
+      action: 'Use /compact every 30-40 tool calls or when switching tasks. Start fresh sessions for new work.',
+    });
+  }
+
+  // 8. Caching savings acknowledgment
   if (cacheHealth.savings.fromCaching > 100) {
     recs.push({
       severity: 'positive',
