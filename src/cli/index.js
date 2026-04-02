@@ -16,6 +16,8 @@ import { analyzeCacheHealth } from '../analyzers/cache-health.js';
 import { detectAnomalies } from '../analyzers/anomaly-detector.js';
 import { generateRecommendations } from '../analyzers/recommendations.js';
 import { detectInflectionPoints } from '../analyzers/inflection-detector.js';
+import { analyzeSessionIntelligence } from '../analyzers/session-intelligence.js';
+import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
 
@@ -115,21 +117,24 @@ async function main() {
   const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, allTimeDays, dailyFromJSONL);
   const anomalies = detectAnomalies(costAnalysis);
   const inflection = detectInflectionPoints(dailyFromJSONL);
+  const sessionIntel = analyzeSessionIntelligence(sessionMeta, jsonlEntries);
+  const modelRouting = analyzeModelRouting(costAnalysis, jsonlEntries);
   const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection);
 
-  if (inflection) {
-    console.log(`  ✓ Inflection point: ${inflection.summary}`);
-  }
-
+  if (inflection) console.log(`  ✓ Inflection: ${inflection.summary}`);
+  if (sessionIntel.available) console.log(`  ✓ ${sessionIntel.totalSessions} sessions analyzed (${sessionIntel.avgDuration} min avg)`);
+  if (modelRouting.available) console.log(`  ✓ Model routing: ${modelRouting.opusPct}% Opus, ${modelRouting.sonnetPct}% Sonnet`);
   console.log(`  ✓ ${projectBreakdown.length} projects detected`);
 
   const report = {
     generatedAt: new Date().toISOString(),
-    periodDays: flags.days, // Default view in HTML
+    periodDays: flags.days,
     costAnalysis,
     cacheHealth,
     anomalies,
     inflection,
+    sessionIntel,
+    modelRouting,
     projectBreakdown,
     claudeMdStack,
     oauthUsage,
