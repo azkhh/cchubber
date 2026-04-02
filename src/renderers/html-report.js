@@ -14,10 +14,12 @@ export function renderHTML(report) {
   const maxCost = Math.max(...chartCosts, 1);
   const maxRatio = Math.max(...chartRatios, 1);
 
-  // Model split data
+  // Model split data — filter out zero-cost entries
   const modelCosts = costAnalysis.modelCosts || {};
-  const modelEntries = Object.entries(modelCosts).sort((a, b) => b[1] - a[1]);
-  const modelColors = ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6'];
+  const modelEntries = Object.entries(modelCosts)
+    .filter(([, cost]) => cost > 0.01)
+    .sort((a, b) => b[1] - a[1]);
+  const modelColors = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'];
 
   // Anomaly dates for highlighting
   const anomalyDates = new Set((anomalies.anomalies || []).map(a => a.date.slice(5)));
@@ -96,22 +98,34 @@ export function renderHTML(report) {
     width: 100%;
     max-width: 680px;
     margin: 0 auto 48px;
-    background: linear-gradient(135deg, #111827 0%, #1a1a2e 50%, #16213e 100%);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 40px;
+    background: linear-gradient(135deg, #0c1222 0%, #131b30 40%, #0f1a2e 70%, #111827 100%);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 20px;
+    padding: 44px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
   }
 
   .share-card::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -30%;
+    top: -60%;
+    right: -25%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, ${grade.color}18 0%, ${grade.color}08 30%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .share-card::after {
+    content: '';
+    position: absolute;
+    bottom: -40%;
+    left: -20%;
     width: 300px;
     height: 300px;
-    background: radial-gradient(circle, ${grade.color}15 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 60%);
     pointer-events: none;
   }
 
@@ -208,14 +222,29 @@ export function renderHTML(report) {
   }
 
   .card {
-    background: var(--bg-card);
+    background: linear-gradient(145deg, var(--bg-card) 0%, #0f1a2b 100%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 20px;
-    transition: border-color 0.2s;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
   }
 
-  .card:hover { border-color: var(--accent); }
+  .card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+  .card:hover::after { opacity: 1; }
 
   .card .label {
     font-size: 12px;
@@ -254,10 +283,11 @@ export function renderHTML(report) {
   /* Model Split */
   .model-bar {
     display: flex;
-    height: 32px;
-    border-radius: 8px;
+    height: 40px;
+    border-radius: 10px;
     overflow: hidden;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
   }
 
   .model-bar-segment {
@@ -469,7 +499,7 @@ export function renderHTML(report) {
         <div class="brand-name">CC Hubber</div>
         <div class="brand-sub">github.com/asmirkn/cchubber</div>
       </div>
-      <div class="brand-sub">Shipped with Mover OS at speed — moveros.dev</div>
+      <a href="https://moveros.dev" target="_blank" class="brand-sub" style="color:var(--text-dim);text-decoration:none;">Shipped with <span style="color:var(--accent)">Mover OS</span> at speed</a>
     </div>
   </div>
 
@@ -635,7 +665,7 @@ export function renderHTML(report) {
   <div class="footer">
     <div>CC Hubber v0.1.0 — <a href="https://github.com/asmirkn/cchubber" target="_blank">github.com/asmirkn/cchubber</a></div>
     <a href="https://moveros.dev" target="_blank" class="mover-badge">
-      <span>Shipped with Mover OS at speed</span>
+      Shipped with <strong style="color:var(--accent)">Mover OS</strong> at speed
     </a>
   </div>
 
