@@ -206,7 +206,7 @@ export function renderHTML(report) {
       position:relative;width:100%;max-width:740px;
       border-radius:22px;overflow:hidden;
       background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
-      box-shadow:0 30px 80px -20px rgba(0,0,0,0.8),inset 0 1px 0 rgba(255,255,255,0.03);
+      box-shadow:0 25px 50px -12px rgba(0,0,0,0.6);
       animation:float 6s ease-in-out infinite;
       cursor:default;
     }
@@ -842,43 +842,36 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
       var timer=setInterval(function(){
         var t=frame/totalFrames;
-        var angle=Math.sin(t*Math.PI*2)*3; // float side to side +-3 degrees
-        var tiltY=Math.cos(t*Math.PI*2)*1.5;
 
-        // Clear with page background
+        // Clear
         ctx.fillStyle='#121315';
         ctx.fillRect(0,0,vw,vh);
 
-        ctx.save();
-        // Center the card and apply 3D-like skew
-        ctx.translate(vw/2,vh/2);
-        // Simulate perspective rotation with skewX
-        ctx.transform(1,Math.sin(tiltY*Math.PI/180)*0.02,Math.sin(angle*Math.PI/180)*-0.04,1,0,0);
-        ctx.translate(-iw/2,-ih/2);
+        // Float movement — translate the card up/down gently
+        var floatY=Math.sin(t*Math.PI*2)*6;
+        var floatX=Math.sin(t*Math.PI*4)*2;
 
-        // Draw rounded card
+        ctx.save();
+        ctx.translate(pad+floatX,pad+floatY);
+
+        // Rounded clip — no shadow drawing (causes artifacts)
         ctx.beginPath();
         ctx.moveTo(r,0);ctx.lineTo(iw-r,0);ctx.quadraticCurveTo(iw,0,iw,r);
         ctx.lineTo(iw,ih-r);ctx.quadraticCurveTo(iw,ih,iw-r,ih);ctx.lineTo(r,ih);
         ctx.quadraticCurveTo(0,ih,0,ih-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
         ctx.closePath();ctx.clip();
 
-        // Card shadow
-        ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=40;ctx.shadowOffsetY=20;
-        ctx.fillStyle='#0f1018';ctx.fillRect(0,0,iw,ih);
-        ctx.shadowColor='transparent';
-
-        // Draw captured card
+        // Draw card
         ctx.drawImage(raw,0,0);
 
         // Shimmer sweep
-        var sx=-iw*0.4+t*iw*1.8;
-        var g=ctx.createLinearGradient(sx,0,sx+iw*0.3,ih);
-        g.addColorStop(0,'rgba(192,193,255,0)');
-        g.addColorStop(0.4,'rgba(192,193,255,0.05)');
-        g.addColorStop(0.5,'rgba(255,255,255,0.1)');
-        g.addColorStop(0.6,'rgba(212,187,255,0.05)');
-        g.addColorStop(1,'rgba(192,193,255,0)');
+        var sx=-iw*0.5+(t%1)*iw*2;
+        var g=ctx.createLinearGradient(sx,0,sx+iw*0.25,ih);
+        g.addColorStop(0,'rgba(255,255,255,0)');
+        g.addColorStop(0.45,'rgba(192,193,255,0.04)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.09)');
+        g.addColorStop(0.55,'rgba(212,187,255,0.04)');
+        g.addColorStop(1,'rgba(255,255,255,0)');
         ctx.fillStyle=g;ctx.fillRect(0,0,iw,ih);
 
         ctx.restore();
