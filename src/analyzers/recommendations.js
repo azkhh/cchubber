@@ -1,126 +1,168 @@
-export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection) {
+/**
+ * Recommendations Engine
+ * Generates actionable recommendations informed by community data (March 2026 crisis).
+ * Every recommendation maps to a real pattern reported by users on GitHub/Twitter/Reddit.
+ */
+export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection, sessionIntel, modelRouting) {
   const recs = [];
 
-  // 0. Inflection point — most important signal, goes first
+  // 0. Inflection point — most important signal
   if (inflection && inflection.direction === 'worsened' && inflection.multiplier >= 2) {
     recs.push({
       severity: 'critical',
-      title: `Efficiency dropped ${inflection.multiplier}x on ${inflection.date}`,
+      title: `Cache efficiency dropped ${inflection.multiplier}x on ${inflection.date}`,
       detail: inflection.summary,
-      action: 'This date likely correlates with a Claude Code update or cache regression. Check your CC version history. v2.1.89 had a known cache bug — v2.1.90 includes a fix.',
+      action: 'Run: claude update. Versions 2.1.69-2.1.89 had a cache sentinel bug that dropped read rates from 95% to 4-17%. Fixed in v2.1.90.',
     });
   } else if (inflection && inflection.direction === 'improved' && inflection.multiplier >= 2) {
     recs.push({
       severity: 'positive',
       title: `Efficiency improved ${inflection.multiplier}x on ${inflection.date}`,
       detail: inflection.summary,
-      action: 'Something changed for the better on this date. Likely a version update or workflow change.',
+      action: 'Your cache efficiency improved here. Likely a version update or workflow change that stuck.',
     });
   }
 
-  // 1. CLAUDE.md size
+  // 1. CLAUDE.md bloat — community-reported 10-20x cost multiplier
   if (claudeMdStack.totalTokensEstimate > 8000) {
+    const dailyCost = claudeMdStack.costPerMessage?.dailyCached200;
     recs.push({
-      severity: 'warning',
-      title: 'Large CLAUDE.md stack',
-      detail: `Your CLAUDE.md files total ~${claudeMdStack.totalTokensEstimate.toLocaleString()} tokens (${(claudeMdStack.totalBytes / 1024).toFixed(1)} KB). This is re-read on every message. At 200 messages/day, this costs ~$${claudeMdStack.costPerMessage.dailyCached200.toFixed(2)}/day cached, or $${claudeMdStack.costPerMessage.dailyUncached200.toFixed(2)}/day if cache breaks.`,
-      action: 'Review your CLAUDE.md for sections that could be moved to project-level files loaded on demand.',
+      severity: claudeMdStack.totalTokensEstimate > 15000 ? 'critical' : 'warning',
+      title: `CLAUDE.md is ${Math.round(claudeMdStack.totalTokensEstimate / 1000)}K tokens`,
+      detail: `Re-read on every turn. Community best practice: keep under 200 lines (~4K tokens). Yours costs ~$${dailyCost ? dailyCost.toFixed(2) : '?'}/day at 200 messages. Each cache break re-reads at 12.5x the cached price.`,
+      action: 'Move rarely-used rules to project-level files. Use skills/hooks instead of inline instructions. Every 1K tokens removed saves ~$0.50/day.',
     });
   }
 
-  // 2. Cache break frequency
+  // 2. Version check — the #1 fix reported by community
+  if (cacheHealth.efficiencyRatio > 1500 || (inflection && inflection.direction === 'worsened')) {
+    recs.push({
+      severity: 'critical',
+      title: 'Update Claude Code to v2.1.90+',
+      detail: 'Versions 2.1.69-2.1.89 had three cache bugs: sentinel replacement error, --resume cache miss, and nested CLAUDE.md re-injection. Community-verified: usage dropped from 80-100% to 5-7% of Max quota after updating.',
+      action: 'Run: claude update. If already on latest, start a fresh session — the fix only applies to new sessions.',
+    });
+  }
+
+  // 3. Cache break analysis
   if (cacheHealth.totalCacheBreaks > 10) {
     const topReason = cacheHealth.reasonsRanked[0];
     recs.push({
       severity: cacheHealth.totalCacheBreaks > 50 ? 'critical' : 'warning',
-      title: `${cacheHealth.totalCacheBreaks} cache breaks detected`,
-      detail: `Each cache break forces a full context re-read at write prices (12.5x cache read cost). Top cause: "${topReason?.reason}" (${topReason?.count} times, ${topReason?.percentage}%).`,
+      title: `${cacheHealth.totalCacheBreaks} cache invalidations`,
+      detail: `Each break forces a full prompt re-read at write prices (12.5x cache read cost). ${topReason ? `Top cause: "${topReason.reason}" (${topReason.count}x, ${topReason.percentage}%).` : ''}`,
       action: topReason?.reason === 'Tool schemas changed'
-        ? 'Reduce MCP tool connections. Each tool add/remove invalidates the cache.'
+        ? 'Reduce MCP server connections. Each tool schema change breaks the cache prefix. Disconnect tools you\'re not actively using.'
         : topReason?.reason === 'System prompt changed'
-        ? 'Avoid editing CLAUDE.md mid-session. Make changes between sessions.'
-        : topReason?.reason === 'TTL expiry'
-        ? 'Keep sessions active. Cache expires after 5 minutes of inactivity.'
-        : 'Review cache break logs in ~/.claude/tmp/cache-break-*.diff for details.',
+        ? 'Stop editing CLAUDE.md mid-session. Batch rule changes between sessions.'
+        : 'Review ~/.claude/tmp/cache-break-*.diff for exact invalidation causes.',
     });
   }
 
-  // 3. High cache:output ratio
+  // 4. High cache:output ratio
   if (cacheHealth.efficiencyRatio > 2000) {
     recs.push({
       severity: 'critical',
-      title: `Cache efficiency ratio: ${cacheHealth.efficiencyRatio.toLocaleString()}:1`,
-      detail: `For every 1 token of output, ${cacheHealth.efficiencyRatio.toLocaleString()} tokens are read from cache. Healthy range is 300-800:1. This could indicate the known Claude Code cache bug (March 2026).`,
-      action: 'Check your Claude Code version. Versions around 2.1.85-2.1.90 have known cache regression bugs. Consider pinning to an earlier version.',
+      title: `Cache ratio ${cacheHealth.efficiencyRatio.toLocaleString()}:1 — abnormally high`,
+      detail: `Healthy range: 300-800:1. You\'re at ${cacheHealth.efficiencyRatio.toLocaleString()}:1 — every output token costs ${cacheHealth.efficiencyRatio.toLocaleString()} cache read tokens. This pattern matches the March 2026 cache bug reported by thousands of users.`,
+      action: 'Immediate fix: update to v2.1.90+. If already updated, avoid --resume flag and start fresh sessions per task.',
     });
   } else if (cacheHealth.efficiencyRatio > 1000) {
     recs.push({
       severity: 'warning',
-      title: `Elevated cache ratio: ${cacheHealth.efficiencyRatio.toLocaleString()}:1`,
-      detail: 'Above average but not critical. Could be large codebase exploration or heavy file reading.',
-      action: 'Use /compact more frequently in long sessions. Start fresh sessions for new tasks.',
+      title: `Cache ratio ${cacheHealth.efficiencyRatio.toLocaleString()}:1 — elevated`,
+      detail: 'Not critical, but above the 300-800 healthy range. Common causes: large codebase exploration, many file reads without /compact, or stale sessions.',
+      action: 'Use /compact every 30-40 tool calls. Start fresh sessions for each distinct task.',
     });
   }
 
-  // 4. Cost anomalies
+  // 5. Opus dominance — community tip: Sonnet handles 60%+ of tasks at 1/5 cost
+  const modelCosts = costAnalysis.modelCosts || {};
+  const totalModelCost = Object.values(modelCosts).reduce((s, c) => s + c, 0);
+  const opusCost = Object.entries(modelCosts).filter(([n]) => n.toLowerCase().includes('opus')).reduce((s, [, c]) => s + c, 0);
+  const opusPct = totalModelCost > 0 ? Math.round((opusCost / totalModelCost) * 100) : 0;
+
+  if (opusPct > 85) {
+    const savings = modelRouting?.estimatedSavings || Math.round(opusCost * 0.16);
+    recs.push({
+      severity: 'warning',
+      title: `${opusPct}% of spend is Opus`,
+      detail: `Opus costs 5x more than Sonnet per token. Sonnet 4.6 handles file reads, search, simple edits, and subagent work at the same quality. Community tip: switching routine tasks to Sonnet dropped quota usage by 60-80%.`,
+      action: `Set model: "sonnet" on subagent/Task calls. Estimated savings: ~$${savings.toLocaleString()}. Reserve Opus for complex reasoning only.`,
+    });
+  }
+
+  // 6. Session length — community-reported: sessions >60 min degrade heavily
+  if (sessionIntel?.available && sessionIntel.longSessionPct > 30) {
+    recs.push({
+      severity: 'warning',
+      title: `${sessionIntel.longSessionPct}% of sessions exceed 60 minutes`,
+      detail: `Long sessions accumulate context that degrades cache efficiency and response quality. Your median: ${sessionIntel.medianDuration}min, p90: ${sessionIntel.p90Duration}min, longest: ${sessionIntel.maxDuration}min.`,
+      action: 'One task, one session. Use /compact for exploration, fresh session for each bug fix or feature. The cost of starting fresh is less than the cost of a bloated context.',
+    });
+  }
+
+  // 7. Peak hour overlap — community-reported: 5am-11am PT has throttled limits
+  if (sessionIntel?.available && sessionIntel.peakOverlapPct > 40) {
+    recs.push({
+      severity: 'info',
+      title: `${sessionIntel.peakOverlapPct}% of your work hits throttled hours`,
+      detail: 'Anthropic reduces 5-hour session limits during weekday peak hours (5am-11am PT / 12pm-6pm UTC). ~7% of users hit limits they wouldn\'t otherwise.',
+      action: 'Shift token-heavy work (refactors, test generation, codebase exploration) to off-peak hours. Session limits are unchanged — only the 5-hour window shrinks.',
+    });
+  }
+
+  // 8. .claudeignore missing — community tip
+  if (claudeMdStack.totalTokensEstimate > 5000) {
+    recs.push({
+      severity: 'info',
+      title: 'Create a .claudeignore file',
+      detail: 'Claude Code reads your project structure on every context load. Excluding node_modules/, dist/, *.lock, __pycache__/, and build artifacts prevents compound token waste.',
+      action: 'Create .claudeignore in your project root: node_modules/\\ndist/\\n*.lock\\n*.min.js\\n__pycache__/\\ntarget/',
+    });
+  }
+
+  // 9. Cost anomalies
   if (anomalies.hasAnomalies) {
     const spikes = anomalies.anomalies.filter(a => a.type === 'spike');
     if (spikes.length > 0) {
       const worst = spikes[0];
       recs.push({
         severity: worst.severity,
-        title: `${spikes.length} cost spike${spikes.length > 1 ? 's' : ''} detected`,
-        detail: `Worst: $${worst.cost.toFixed(2)} on ${worst.date} (${worst.zScore > 0 ? '+' : ''}${worst.deviation.toFixed(2)} from average of $${worst.avgCost.toFixed(2)}).${worst.cacheRatioAnomaly ? ' Cache ratio was also anomalous — likely cache bug impact.' : ''}`,
-        action: 'Compare session activity on spike days. Look for long sessions without /compact, or sessions where many MCP tools were connected.',
+        title: `${spikes.length} cost spike${spikes.length > 1 ? 's' : ''} — worst: $${worst.cost.toFixed(0)} on ${worst.date}`,
+        detail: `+$${worst.deviation.toFixed(0)} above your $${worst.avgCost.toFixed(0)} daily average.${worst.cacheRatioAnomaly ? ' Cache ratio was also anomalous — strongly suggests cache bug.' : ''} GitHub #38029 documents a bug where a single session generated 652K phantom output tokens ($342).`,
+        action: 'Monitor the first 1-2 messages of each session. If a single message burns 3-5% of your quota, restart immediately.',
       });
     }
   }
 
-  // 5. Cost trend
+  // 10. --resume warning
+  if (cacheHealth.efficiencyRatio > 800) {
+    recs.push({
+      severity: 'info',
+      title: 'Avoid --resume on older versions',
+      detail: 'The --resume and --continue flags caused full prompt-cache misses on every resume in v2.1.69-2.1.89. Cost: ~$0.15 per resume on a 500K token conversation. Fixed in v2.1.90.',
+      action: 'If on v2.1.90+, --resume is safe. Otherwise, copy your last message and start a new session instead.',
+    });
+  }
+
+  // 11. Positive: cache savings
+  if (cacheHealth.savings?.fromCaching > 100) {
+    recs.push({
+      severity: 'positive',
+      title: `Cache saved you ~$${cacheHealth.savings.fromCaching.toLocaleString()}`,
+      detail: 'Without prompt caching, standard input pricing would have applied to all cache reads. The system is working — optimization is about reducing breaks.',
+      action: 'Keep sessions alive to maximize hits. Avoid mid-session CLAUDE.md edits and MCP tool changes.',
+    });
+  }
+
+  // 12. Cost trend
   if (anomalies.trend === 'rising_fast') {
     recs.push({
       severity: 'critical',
-      title: 'Costs rising rapidly',
-      detail: 'Your recent 7-day average is significantly higher than your historical average.',
-      action: 'This may be related to the March 2026 Claude Code cache bug. Check Anthropic status for updates.',
-    });
-  }
-
-  // 6. Opus dominance
-  const modelCosts = costAnalysis.modelCosts || {};
-  const totalModelCost = Object.values(modelCosts).reduce((s, c) => s + c, 0);
-  const opusCost = Object.entries(modelCosts)
-    .filter(([name]) => name.includes('opus'))
-    .reduce((s, [, c]) => s + c, 0);
-  const opusPercentage = totalModelCost > 0 ? (opusCost / totalModelCost) * 100 : 0;
-
-  if (opusPercentage > 90) {
-    recs.push({
-      severity: 'info',
-      title: `${Math.round(opusPercentage)}% of costs from Opus`,
-      detail: 'Opus is the most expensive model. Subagents and simple tasks could use Sonnet or Haiku.',
-      action: 'Set model: "sonnet" or "haiku" on Task tool calls for search, documentation lookup, and log analysis.',
-    });
-  }
-
-  // 7. Session depth — long sessions without compact
-  const sessions = costAnalysis.sessions || {};
-  if (sessions.avgDurationMinutes > 60) {
-    recs.push({
-      severity: 'warning',
-      title: `Average session: ${Math.round(sessions.avgDurationMinutes)} minutes`,
-      detail: `Long sessions accumulate context that degrades both performance and cache efficiency. Sessions over 60 minutes often benefit from /compact.`,
-      action: 'Use /compact every 30-40 tool calls or when switching tasks. Start fresh sessions for new work.',
-    });
-  }
-
-  // 8. Caching savings acknowledgment
-  if (cacheHealth.savings.fromCaching > 100) {
-    recs.push({
-      severity: 'positive',
-      title: `Caching saved you ~$${cacheHealth.savings.fromCaching.toLocaleString()}`,
-      detail: 'Without prompt caching, your bill would be significantly higher. The cache system is working — the question is whether it breaks too often.',
-      action: 'No action needed. Keep sessions alive to maximize cache hits.',
+      title: 'Costs rising sharply',
+      detail: 'Your recent 7-day average is significantly higher than historical. Multiple users reported 10x faster consumption after the April 1 update.',
+      action: 'Immediate: claude update. Then: start fresh sessions, avoid --resume, check MCP tool count. If persists, report to github.com/anthropics/claude-code/issues.',
     });
   }
 

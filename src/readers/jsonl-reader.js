@@ -213,26 +213,17 @@ export function aggregateByProject(entries, claudeDir) {
     if (entry.timestamp < p.firstSeen) p.firstSeen = entry.timestamp;
   }
 
-  // Resolve project paths from .claude/projects/<hash>/.project_path if available
-  const projectsDir = join(claudeDir, 'projects');
+  // Decode project paths from directory names
+  // Claude Code encodes paths as: C--Users-asmir-Documents-Project-Name
+  // Decode: replace leading drive letter pattern, split on -, take last meaningful segments
   for (const proj of Object.values(byProject)) {
     proj.sessionCount = proj.sessions.size;
     delete proj.sessions;
 
-    // Try to read the project path file
-    try {
-      const pathFile = join(projectsDir, proj.hash, '.project_path');
-      if (existsSync(pathFile)) {
-        const raw = readFileSync(pathFile, 'utf-8').trim();
-        proj.path = raw;
-        // Use last directory segment as display name
-        proj.name = raw.split(/[/\\]/).filter(Boolean).pop() || proj.hash.slice(0, 8);
-      } else {
-        proj.name = proj.hash.slice(0, 8);
-      }
-    } catch {
-      proj.name = proj.hash.slice(0, 8);
-    }
+    // Decode the hash (which is the encoded path)
+    const decoded = decodeProjectHash(proj.hash);
+    proj.path = decoded.path;
+    proj.name = decoded.name;
   }
 
   return Object.values(byProject)
@@ -244,4 +235,51 @@ function cleanModelName(name) {
     .replace('claude-', '')
     .replace(/-\d{8}$/, '')
     .replace(/-20\d{6}$/, '');
+}
+
+/**
+ * Decode Claude Code's encoded project directory name into a readable path and name.
+ * Format: C--Users-asmir-Documents-Obsidian-Architect-OS-01-Projects-My-Project
+ * Becomes: C:/Users/asmir/Documents/.../My-Project → name: "My-Project"
+ */
+function decodeProjectHash(hash) {
+  if (!hash || hash === 'unknown') return { path: null, name: 'Unknown' };
+
+  // Replace the drive letter pattern: C-- → C:/
+  let decoded = hash.replace(/^([A-Z])--/, '$1:/');
+
+  // The rest uses - as separator, but some folder names have dashes too.
+  // Best heuristic: split on known path separators
+  // Common patterns: Users, Documents, Desktop, Projects, etc.
+  const pathSegments = decoded.split('-');
+
+  // Reconstruct a readable path
+  // The encoded format replaces / with - so we need to figure out boundaries
+  // Simple approach: reconstruct full path and extract last meaningful project name
+  const fullPath = decoded;
+
+  // Extract project name: take the last meaningful segments
+  // Skip common prefixes to find the project-specific part
+  const skipPrefixes = ['C:', 'Users', 'Documents', 'Desktop', 'Downloads', 'Obsidian', 'repos', 'projects', 'code', 'dev', 'src', 'home'];
+
+  let segments = hash.replace(/^[A-Z]--/, '').split('-');
+
+  // Find where the "interesting" name starts (after common path prefixes)
+  let nameStart = 0;
+  for (let i = 0; i < segments.length; i++) {
+    if (skipPrefixes.some(p => p.toLowerCase() === segments[i].toLowerCase())) {
+      nameStart = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  // Take the last 2-3 meaningful segments as the project name
+  const nameSegments = segments.slice(Math.max(nameStart, segments.length - 3));
+  const name = nameSegments.join(' ') || hash.slice(0, 12);
+
+  // Reconstruct a shortened display path
+  const path = hash.replace(/^([A-Z])--/, '$1:/').replace(/-/g, '/');
+
+  return { path, name };
 }
