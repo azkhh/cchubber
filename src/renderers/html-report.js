@@ -279,7 +279,7 @@ export function renderHTML(report) {
     </button>
     <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
       <span class="material-symbols-outlined text-sm">gif_box</span>
-      Save GIF
+      Save Video
     </button>
   </div>
 </section>
@@ -609,7 +609,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<!-- Video export uses native MediaRecorder API, no external libs -->
 <script>
 (function(){
   var D=${dailyCostsJSON}, P=${projectsJSON};
@@ -753,21 +753,34 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   function captureCard(){
     var card=document.getElementById('share-card');
     if(!card||typeof html2canvas==='undefined')return Promise.reject();
-    // Pause animation, flatten transform
     card.style.animation='none';
     card.style.transform='none';
     var w=card.offsetWidth,h=card.offsetHeight;
     return html2canvas(card,{
-      backgroundColor:'#0f1018',
-      scale:2,
+      backgroundColor:null,
+      scale:3,
       useCORS:true,
       logging:false,
       width:w,
       height:h,
       windowWidth:w+100,
-    }).then(function(c){
+    }).then(function(raw){
       card.style.animation='';card.style.transform='';
-      return c;
+      // Draw onto new canvas with rounded corners and background
+      var s=3,rw=w*s,rh=h*s,r=20*s;
+      var out=document.createElement('canvas');out.width=rw;out.height=rh;
+      var ctx=out.getContext('2d');
+      // Rounded rect clip
+      ctx.beginPath();
+      ctx.moveTo(r,0);ctx.lineTo(rw-r,0);ctx.quadraticCurveTo(rw,0,rw,r);
+      ctx.lineTo(rw,rh-r);ctx.quadraticCurveTo(rw,rh,rw-r,rh);
+      ctx.lineTo(r,rh);ctx.quadraticCurveTo(0,rh,0,rh-r);
+      ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+      ctx.closePath();ctx.clip();
+      // Fill background then draw card
+      ctx.fillStyle='#0f1018';ctx.fillRect(0,0,rw,rh);
+      ctx.drawImage(raw,0,0,rw,rh);
+      return out;
     });
   }
 
@@ -785,53 +798,60 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     });
   });
 
-  // GIF export — captures card with shimmer animation frames
+  // Video export — records shimmer animation as WebM using MediaRecorder
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
-    if(typeof GIF==='undefined'){showToast('GIF library failed to load');return}
     gb.textContent='Recording...';gb.disabled=true;
-    var card=document.getElementById('share-card');
-    if(!card){gb.textContent='Save GIF';gb.disabled=false;return}
 
-    // Capture multiple frames with shimmer at different positions
-    var gif=new GIF({workers:2,quality:8,width:0,height:0,workerScript:'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'});
-    var totalFrames=10;var frameDelay=120;var frameIdx=0;
+    captureCard().then(function(staticCanvas){
+      var w=staticCanvas.width,h=staticCanvas.height;
+      var anim=document.createElement('canvas');anim.width=w;anim.height=h;
+      var ctx=anim.getContext('2d');
+      var stream=anim.captureStream(30);
+      var chunks=[];
+      var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:5000000});
+      recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+      recorder.onstop=function(){
+        var blob=new Blob(chunks,{type:'video/webm'});
+        var a=document.createElement('a');a.download='cchubber-card.webm';
+        a.href=URL.createObjectURL(blob);a.click();
+        gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
+        gb.disabled=false;showToast('Video saved');
+      };
 
-    function captureFrame(){
-      if(frameIdx>=totalFrames){
-        gb.textContent='Encoding...';
-        gif.render();
-        return;
+      var frame=0,total=90; // 3 sec at 30fps
+      recorder.start();
+
+      function draw(){
+        if(frame>=total){recorder.stop();return}
+        var t=frame/total;
+        ctx.drawImage(staticCanvas,0,0);
+        // Shimmer sweep
+        var sx=-w*0.4+t*w*1.8;
+        var g=ctx.createLinearGradient(sx,0,sx+w*0.4,h);
+        g.addColorStop(0,'rgba(192,193,255,0)');
+        g.addColorStop(0.45,'rgba(192,193,255,0.07)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.1)');
+        g.addColorStop(0.55,'rgba(212,187,255,0.07)');
+        g.addColorStop(1,'rgba(192,193,255,0)');
+        // Clip rounded
+        var r=20*3;
+        ctx.save();ctx.beginPath();
+        ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
+        ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);ctx.lineTo(r,h);
+        ctx.quadraticCurveTo(0,h,0,h-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+        ctx.closePath();ctx.clip();
+        ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+        ctx.restore();
+        frame++;
+        requestAnimationFrame(draw);
       }
-      // Shift shimmer position per frame
-      var pct=-200+((frameIdx/totalFrames)*400);
-      var shimEl=card.querySelector('.cc-inner');
-      if(shimEl)card.style.backgroundPosition=pct+'% 0';
-
-      card.style.animation='none';
-      card.style.transform='perspective(800px) rotateY('+(Math.sin(frameIdx/totalFrames*Math.PI*2)*3)+'deg) rotateX('+(Math.cos(frameIdx/totalFrames*Math.PI*2)*1.5)+'deg)';
-
-      var cw=card.offsetWidth,ch=card.offsetHeight;
-      html2canvas(card,{backgroundColor:'#0f1018',scale:1,useCORS:true,logging:false,width:cw,height:ch,windowWidth:cw+100}).then(function(c){
-        // Skip rounded corners for GIF (encoding handles it)
-
-        if(frameIdx===0){gif.options.width=w;gif.options.height=h}
-        gif.addFrame(c,{delay:frameDelay,copy:true});
-        frameIdx++;
-        setTimeout(captureFrame,50);
-      }).catch(function(){frameIdx=totalFrames;captureFrame()});
-    }
-
-    gif.on('finished',function(blob){
-      var url=URL.createObjectURL(blob);
-      var a=document.createElement('a');a.download='cchubber-card.gif';a.href=url;a.click();
-      URL.revokeObjectURL(url);
-      card.style.animation='';card.style.transform='';
-      gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save GIF';
-      gb.disabled=false;showToast('GIF saved');
+      draw();
+    }).catch(function(){
+      gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
+      gb.disabled=false;showToast('Failed');
     });
-
-    captureFrame();
   });
 
   setR('all');
