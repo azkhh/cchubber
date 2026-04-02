@@ -189,10 +189,12 @@ export function analyzeUsage(statsCache, sessionMeta, days, dailyFromJSONL, mode
 }
 
 function cleanModelName(name) {
-  return name
+  return (name || 'unknown')
     .replace('claude-', '')
-    .replace(/-\d{8}$/, '')
-    .replace(/-\d+$/, '');
+    .replace(/-20\d{6}$/, '') // Remove date suffixes like -20251001
+    .replace(/^(opus|sonnet|haiku)-(\d+)-(\d+)$/, '$1 $2.$3') // opus-4-6 -> opus 4.6
+    .replace(/^(opus|sonnet|haiku)-(\d+)$/, '$1 $2') // opus-4 -> opus 4
+    .replace(/^(\w)/, c => c.toUpperCase()); // Capitalize first letter
 }
 
 function median(arr) {
@@ -244,16 +246,14 @@ function analyzeFromJSONL(dailyFromJSONL, modelFromJSONL, sessionMeta, days, cut
 
   const activeDays = dailyCosts.filter(d => d.cost > 0.01).length;
 
-  // Model cost breakdown
+  // Model cost breakdown — from filtered daily data (must match period)
   const modelCosts = {};
-  for (const [name, m] of Object.entries(modelFromJSONL || {})) {
-    const cost = calculateCost(name, {
-      inputTokens: m.inputTokens,
-      outputTokens: m.outputTokens,
-      cacheCreationTokens: m.cacheCreationTokens,
-      cacheReadTokens: m.cacheReadTokens,
-    });
-    modelCosts[cleanModelName(name)] = cost.total;
+  for (const day of dailyCosts) {
+    for (const m of day.models) {
+      const name = cleanModelName(m.model);
+      if (!modelCosts[name]) modelCosts[name] = 0;
+      modelCosts[name] += m.cost;
+    }
   }
 
   // Session analysis
