@@ -606,7 +606,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<!-- Video export uses native MediaRecorder API, no external libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
 <script>
 (function(){
   var D=${dailyCostsJSON}, P=${projectsJSON};
@@ -747,36 +747,66 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   var toast=document.getElementById('toast');
   function showToast(m){if(!toast)return;toast.textContent=m;toast.classList.add('on');setTimeout(function(){toast.classList.remove('on')},2000)}
 
-  function captureCard(){
+  function captureCard(targetScale){
     var card=document.getElementById('share-card');
-    if(!card||typeof html2canvas==='undefined')return Promise.reject();
+    if(!card)return Promise.reject();
     card.style.animation='none';
     card.style.transform='none';
     var w=card.offsetWidth,h=card.offsetHeight;
-    return html2canvas(card,{
-      backgroundColor:null,
-      scale:3,
-      useCORS:true,
-      logging:false,
-      width:w,
-      height:h,
-      windowWidth:w+100,
-    }).then(function(raw){
+    var s=targetScale||3;
+
+    // Try dom-to-image first (uses SVG foreignObject — much sharper)
+    var useDomToImage=typeof domtoimage!=='undefined';
+    var capturePromise;
+
+    if(useDomToImage){
+      capturePromise=domtoimage.toPng(card,{
+        width:w,height:h,
+        style:{animation:'none',transform:'none'},
+        quality:1,
+      }).then(function(dataUrl){
+        return new Promise(function(resolve){
+          var img=new Image();
+          img.onload=function(){
+            var out=document.createElement('canvas');out.width=w*s;out.height=h*s;
+            var ctx=out.getContext('2d');
+            ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+            // Rounded clip
+            var r=22*s;
+            ctx.beginPath();
+            ctx.moveTo(r,0);ctx.lineTo(w*s-r,0);ctx.quadraticCurveTo(w*s,0,w*s,r);
+            ctx.lineTo(w*s,h*s-r);ctx.quadraticCurveTo(w*s,h*s,w*s-r,h*s);
+            ctx.lineTo(r,h*s);ctx.quadraticCurveTo(0,h*s,0,h*s-r);
+            ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+            ctx.closePath();ctx.clip();
+            ctx.fillStyle='#0f1018';ctx.fillRect(0,0,w*s,h*s);
+            ctx.drawImage(img,0,0,w*s,h*s);
+            resolve(out);
+          };
+          img.src=dataUrl;
+        });
+      });
+    } else {
+      capturePromise=html2canvas(card,{
+        backgroundColor:null,scale:s,useCORS:true,logging:false,width:w,height:h,windowWidth:w+100,
+      }).then(function(raw){
+        var out=document.createElement('canvas');out.width=w*s;out.height=h*s;
+        var ctx=out.getContext('2d');
+        var r=22*s;
+        ctx.beginPath();
+        ctx.moveTo(r,0);ctx.lineTo(w*s-r,0);ctx.quadraticCurveTo(w*s,0,w*s,r);
+        ctx.lineTo(w*s,h*s-r);ctx.quadraticCurveTo(w*s,h*s,w*s-r,h*s);
+        ctx.lineTo(r,h*s);ctx.quadraticCurveTo(0,h*s,0,h*s-r);
+        ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+        ctx.closePath();ctx.clip();
+        ctx.fillStyle='#0f1018';ctx.fillRect(0,0,w*s,h*s);
+        ctx.drawImage(raw,0,0,w*s,h*s);
+        return out;
+      });
+    }
+
+    return capturePromise.then(function(out){
       card.style.animation='';card.style.transform='';
-      // Draw onto new canvas with rounded corners and background
-      var s=3,rw=w*s,rh=h*s,r=20*s;
-      var out=document.createElement('canvas');out.width=rw;out.height=rh;
-      var ctx=out.getContext('2d');
-      // Rounded rect clip
-      ctx.beginPath();
-      ctx.moveTo(r,0);ctx.lineTo(rw-r,0);ctx.quadraticCurveTo(rw,0,rw,r);
-      ctx.lineTo(rw,rh-r);ctx.quadraticCurveTo(rw,rh,rw-r,rh);
-      ctx.lineTo(r,rh);ctx.quadraticCurveTo(0,rh,0,rh-r);
-      ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-      ctx.closePath();ctx.clip();
-      // Fill background then draw card
-      ctx.fillStyle='#0f1018';ctx.fillRect(0,0,rw,rh);
-      ctx.drawImage(raw,0,0,rw,rh);
       return out;
     });
   }
@@ -802,98 +832,75 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     var card=document.getElementById('share-card');
     if(!card){gb.textContent='Save Video';gb.disabled=false;return}
 
-    // Wait for fonts then capture at exact video resolution
+    // Capture card using dom-to-image at 2x for sharp 1080p video
     document.fonts.ready.then(function(){
-      card.style.animation='none';card.style.transform='none';
-      var ew=card.offsetWidth,eh=card.offsetHeight;
-
-      // Target: card fills ~80% of 1080p width
+      // Use captureCard with scale that fits 1080p
       var VW=1920,VH=1080;
-      var targetW=VW*0.78;
+      var ew=card.offsetWidth;
+      var targetW=VW*0.76;
       var vidScale=targetW/ew;
-      var cw=Math.round(ew*vidScale),ch=Math.round(eh*vidScale);
-      var captureScale=vidScale; // capture at exact needed resolution
 
-      return html2canvas(card,{
-        backgroundColor:null,scale:captureScale,useCORS:true,logging:false,
-        width:ew,height:eh,windowWidth:ew+100,
-      }).then(function(raw){
-        card.style.animation='';card.style.transform='';
-
-        // raw is now exactly cw x ch pixels — no rescaling needed
+      return captureCard(vidScale).then(function(cardCanvas){
+        var cw=cardCanvas.width,ch=cardCanvas.height;
         var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
-        var r=Math.round(22*captureScale);
 
         var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
         var ctx=canvas.getContext('2d');
-        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
 
         var stream=canvas.captureStream(0);
         var chunks=[];
-        var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-        var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:20000000});
+        var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:25000000});
         recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
         recorder.onstop=function(){
-          var blob=new Blob(chunks,{type:'video/webm'});
-          var a=document.createElement('a');a.download='cchubber-card.webm';
+          var blob=new Blob(chunks,{type:'video/mp4'});
+          var a=document.createElement('a');a.download='cchubber-card.mp4';
           a.href=URL.createObjectURL(blob);a.click();
           gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
           gb.disabled=false;showToast('Video saved');
         };
 
-        var duration=4000,startTime=null;
+        var duration=5000,startTime=null;
         recorder.start(50);
 
-        function animate(timestamp){
-          if(!startTime)startTime=timestamp;
-          var elapsed=timestamp-startTime;
+        function animate(ts){
+          if(!startTime)startTime=ts;
+          var elapsed=ts-startTime;
           if(elapsed>=duration){
             try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
-            setTimeout(function(){recorder.stop()},200);
+            setTimeout(function(){recorder.stop()},300);
             return;
           }
 
           var t=elapsed/duration;
-          // Smooth eased float matching CSS ease-in-out
-          var ease=0.5-0.5*Math.cos(t*Math.PI*2);
-          var dx=(ease-0.5)*20; // gentle horizontal drift
-          var dy=Math.sin(t*Math.PI*4)*5; // subtle vertical bob
+          // Match CSS: perspective rotateY oscillation — approximate as horizontal shift + subtle scale
+          var phase=Math.sin(t*Math.PI*2);
+          var dx=phase*16;
+          var scaleX=1-Math.abs(phase)*0.008; // subtle width squeeze simulates perspective
 
           ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
-
           ctx.save();
-          ctx.translate(cx+dx,cy+dy);
-
-          // Rounded clip
-          ctx.beginPath();
-          ctx.moveTo(r,0);ctx.lineTo(cw-r,0);ctx.quadraticCurveTo(cw,0,cw,r);
-          ctx.lineTo(cw,ch-r);ctx.quadraticCurveTo(cw,ch,cw-r,ch);ctx.lineTo(r,ch);
-          ctx.quadraticCurveTo(0,ch,0,ch-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-          ctx.closePath();ctx.clip();
-
-          // Draw card at native resolution (no scaling = no blur)
-          ctx.drawImage(raw,0,0);
+          ctx.translate(VW/2+dx,cy);
+          ctx.scale(scaleX,1);
+          ctx.translate(-cw/2,0);
+          ctx.drawImage(cardCanvas,0,0);
 
           // Shimmer
-          var sx=-cw*0.4+t*cw*1.8;
+          var sx=-cw*0.3+(t%1)*cw*1.6;
           var g=ctx.createLinearGradient(sx,0,sx+cw*0.2,ch);
           g.addColorStop(0,'rgba(255,255,255,0)');
-          g.addColorStop(0.45,'rgba(192,193,255,0.04)');
-          g.addColorStop(0.5,'rgba(255,255,255,0.08)');
-          g.addColorStop(0.55,'rgba(212,187,255,0.04)');
+          g.addColorStop(0.45,'rgba(192,193,255,0.03)');
+          g.addColorStop(0.5,'rgba(255,255,255,0.07)');
+          g.addColorStop(0.55,'rgba(212,187,255,0.03)');
           g.addColorStop(1,'rgba(255,255,255,0)');
           ctx.fillStyle=g;ctx.fillRect(0,0,cw,ch);
-
           ctx.restore();
 
           try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
           requestAnimationFrame(animate);
         }
-
         requestAnimationFrame(animate);
       });
     }).catch(function(){
-      card.style.animation='';card.style.transform='';
       gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
       gb.disabled=false;showToast('Failed');
     });
