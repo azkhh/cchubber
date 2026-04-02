@@ -201,7 +201,7 @@ export function renderHTML(report) {
 <section class="flex flex-col items-center">
   <style>
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-    @keyframes float{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
+    @keyframes float{0%,100%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
     .cc-card{
       position:relative;width:100%;max-width:740px;
       border-radius:22px;overflow:hidden;
@@ -217,11 +217,7 @@ export function renderHTML(report) {
       animation:shimmer 4s ease-in-out infinite;
       pointer-events:none;z-index:2;
     }
-    .cc-card::after{
-      content:'';position:absolute;top:-50%;right:-50%;width:100%;height:100%;
-      background:radial-gradient(circle,rgba(192,193,255,0.06) 0%,transparent 60%);
-      pointer-events:none;z-index:1;
-    }
+    .cc-card::after{display:none;}
     .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:36px;padding:40px 44px;}
   </style>
   <div class="cc-card" id="share-card">
@@ -238,7 +234,7 @@ export function renderHTML(report) {
           </div>
         </div>
         <div class="text-right">
-          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block">Claude Code</span>
+          <span class="text-[10px] font-mono uppercase tracking-[0.1em] text-[#908fa0] font-bold block">Claude Code</span>
           <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#343536] block" id="card-range">All time</span>
         </div>
       </div>
@@ -808,12 +804,13 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
     // Create a wrapper div that crops just the card area with padding
     var wrapper=document.createElement('div');
-    wrapper.style.cssText='position:fixed;top:0;left:0;width:'+(card.offsetWidth+80)+'px;height:'+(card.offsetHeight+80)+'px;background:#121315;display:flex;align-items:center;justify-content:center;z-index:99999;';
+    wrapper.style.cssText='position:fixed;top:0;left:0;width:'+(card.offsetWidth+100)+'px;height:'+(card.offsetHeight+100)+'px;background:#000000;display:flex;align-items:center;justify-content:center;z-index:99999;';
 
     // Clone the card into the wrapper so it has the same CSS animations
     var clone=card.cloneNode(true);
     clone.removeAttribute('id');
-    clone.style.animation='float 3s ease-in-out infinite';
+    clone.style.animation='float 4s ease-in-out infinite';
+    clone.style.boxShadow='0 25px 50px -12px rgba(0,0,0,0.8)';
     wrapper.appendChild(clone);
     document.body.appendChild(wrapper);
 
@@ -848,7 +845,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         setTimeout(function(){recorder.stop()},300);
         return;
       }
-      html2canvas(wrapper,{backgroundColor:'#121315',scale:2,useCORS:true,logging:false}).then(function(snap){
+      html2canvas(wrapper,{backgroundColor:'#000000',scale:2,useCORS:true,logging:false}).then(function(snap){
         canvasCtx.clearRect(0,0,canvas.width,canvas.height);
         canvasCtx.drawImage(snap,0,0,canvas.width,canvas.height);
         try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
