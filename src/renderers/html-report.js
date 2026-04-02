@@ -238,7 +238,8 @@ export function renderHTML(report) {
           </div>
         </div>
         <div class="text-right">
-          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block" id="card-range">All time</span>
+          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block">Claude Code</span>
+          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#343536] block" id="card-range">All time</span>
         </div>
       </div>
 
@@ -798,94 +799,68 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     });
   });
 
-  // Video export — records shimmer animation as WebM using MediaRecorder
+  // Video export — screen-records the actual CSS-animated card element
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
     gb.textContent='Recording...';gb.disabled=true;
-
-    // Capture at higher quality for video
     var card=document.getElementById('share-card');
     if(!card){gb.textContent='Save Video';gb.disabled=false;return}
-    card.style.animation='none';card.style.transform='none';
-    var cw=card.offsetWidth,ch=card.offsetHeight;
 
-    html2canvas(card,{backgroundColor:null,scale:2,useCORS:true,logging:false,width:cw,height:ch,windowWidth:cw+100}).then(function(raw){
-      card.style.animation='';card.style.transform='';
+    // Create a wrapper div that crops just the card area with padding
+    var wrapper=document.createElement('div');
+    wrapper.style.cssText='position:fixed;top:0;left:0;width:'+(card.offsetWidth+80)+'px;height:'+(card.offsetHeight+80)+'px;background:#121315;display:flex;align-items:center;justify-content:center;z-index:99999;';
 
-      // Render canvas bigger for video quality — add padding for 3D movement
-      var pad=40;
-      var vw=raw.width+pad*2,vh=raw.height+pad*2;
-      var anim=document.createElement('canvas');anim.width=vw;anim.height=vh;
-      var ctx=anim.getContext('2d');
-      var stream=anim.captureStream(0);
-      var chunks=[];
-      var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:12000000});
-      recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
-      recorder.onstop=function(){
-        var blob=new Blob(chunks,{type:'video/webm'});
-        var a=document.createElement('a');a.download='cchubber-card.webm';
-        a.href=URL.createObjectURL(blob);a.click();
-        gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-        gb.disabled=false;showToast('Video saved');
-      };
+    // Clone the card into the wrapper so it has the same CSS animations
+    var clone=card.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.style.animation='float 3s ease-in-out infinite';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
-      var duration=4000; // 4 seconds
-      var fps=30;
-      var interval=1000/fps;
-      var frame=0;
-      var totalFrames=Math.floor(duration/interval);
-      var iw=raw.width,ih=raw.height;
-      var r=22*2; // border radius * scale
+    // Use html2canvas in a loop? No — use screen capture of the wrapper
+    // Actually, use a canvas + repeated html2canvas calls
+    // Simpler: just offer to screen-record via native API
+    // Most reliable: use the page's own rendering via an iframe approach
 
-      recorder.start(100);
-
-      var timer=setInterval(function(){
-        var t=frame/totalFrames;
-
-        // Clear
-        ctx.fillStyle='#121315';
-        ctx.fillRect(0,0,vw,vh);
-
-        // Float movement — translate the card up/down gently
-        var floatY=Math.sin(t*Math.PI*2)*6;
-        var floatX=Math.sin(t*Math.PI*4)*2;
-
-        ctx.save();
-        ctx.translate(pad+floatX,pad+floatY);
-
-        // Rounded clip — no shadow drawing (causes artifacts)
-        ctx.beginPath();
-        ctx.moveTo(r,0);ctx.lineTo(iw-r,0);ctx.quadraticCurveTo(iw,0,iw,r);
-        ctx.lineTo(iw,ih-r);ctx.quadraticCurveTo(iw,ih,iw-r,ih);ctx.lineTo(r,ih);
-        ctx.quadraticCurveTo(0,ih,0,ih-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-        ctx.closePath();ctx.clip();
-
-        // Draw card
-        ctx.drawImage(raw,0,0);
-
-        // Shimmer sweep
-        var sx=-iw*0.5+(t%1)*iw*2;
-        var g=ctx.createLinearGradient(sx,0,sx+iw*0.25,ih);
-        g.addColorStop(0,'rgba(255,255,255,0)');
-        g.addColorStop(0.45,'rgba(192,193,255,0.04)');
-        g.addColorStop(0.5,'rgba(255,255,255,0.09)');
-        g.addColorStop(0.55,'rgba(212,187,255,0.04)');
-        g.addColorStop(1,'rgba(255,255,255,0)');
-        ctx.fillStyle=g;ctx.fillRect(0,0,iw,ih);
-
-        ctx.restore();
-
-        try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
-        frame++;
-        if(frame>=totalFrames){clearInterval(timer);setTimeout(function(){recorder.stop()},300)}
-      },interval);
-
-    }).catch(function(){
-      card.style.animation='';card.style.transform='';
+    // Simplest reliable approach: record the wrapper using setInterval + html2canvas frames
+    var chunks=[];
+    var cw=parseInt(wrapper.style.width),ch=parseInt(wrapper.style.height);
+    var canvas=document.createElement('canvas');canvas.width=cw*2;canvas.height=ch*2;
+    var canvasCtx=canvas.getContext('2d');
+    var stream=canvas.captureStream(0);
+    var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+    var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:10000000});
+    recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+    recorder.onstop=function(){
+      wrapper.remove();
+      var blob=new Blob(chunks,{type:'video/webm'});
+      var a=document.createElement('a');a.download='cchubber-card.webm';
+      a.href=URL.createObjectURL(blob);a.click();
       gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-      gb.disabled=false;showToast('Failed');
-    });
+      gb.disabled=false;showToast('Video saved');
+    };
+
+    recorder.start(100);
+    var frameCount=0;var maxFrames=30; // ~30 captures over 4 seconds
+
+    function captureVideoFrame(){
+      if(frameCount>=maxFrames){
+        setTimeout(function(){recorder.stop()},300);
+        return;
+      }
+      html2canvas(wrapper,{backgroundColor:'#121315',scale:2,useCORS:true,logging:false}).then(function(snap){
+        canvasCtx.clearRect(0,0,canvas.width,canvas.height);
+        canvasCtx.drawImage(snap,0,0,canvas.width,canvas.height);
+        try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
+        frameCount++;
+        setTimeout(captureVideoFrame,133); // ~7.5 fps html2canvas (slow but real CSS)
+      }).catch(function(){
+        frameCount=maxFrames;captureVideoFrame();
+      });
+    }
+
+    // Give CSS animation a moment to start
+    setTimeout(captureVideoFrame,200);
   });
 
   setR('all');
