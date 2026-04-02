@@ -206,7 +206,7 @@ export function renderHTML(report) {
       position:relative;width:100%;max-width:740px;
       border-radius:22px;overflow:hidden;
       background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
-      box-shadow:0 25px 50px -12px rgba(0,0,0,0.6);
+      box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);
       animation:float 6s ease-in-out infinite;
       cursor:default;
     }
@@ -806,12 +806,13 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
       var ctx=canvas.getContext('2d');
 
-      // Scale card to fit nicely in frame (80% of height)
-      var targetH=VH*0.75;
+      // Scale card to fit 1080p frame with padding
+      var targetH=VH*0.7;
       var scale=targetH/cardImg.height;
-      var cw=cardImg.width*scale,ch=cardImg.height*scale;
-      var cx=(VW-cw)/2,cy=(VH-ch)/2;
-      var r=22*scale; // border radius scaled
+      if(cardImg.width*scale>VW*0.85)scale=(VW*0.85)/cardImg.width;
+      var cw=Math.round(cardImg.width*scale),ch=Math.round(cardImg.height*scale);
+      var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
+      var r=Math.round(22*scale);
 
       var stream=canvas.captureStream(30);
       var chunks=[];
@@ -833,15 +834,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         if(frame>=totalFrames){clearInterval(timer);setTimeout(function(){recorder.stop()},200);return}
 
         var t=frame/totalFrames;
-        var ease=Math.sin(t*Math.PI*2); // smooth oscillation
 
         // Black background
         ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
 
         ctx.save();
-        // Float: gentle perspective-like movement
-        var dx=ease*12;
-        var dy=Math.cos(t*Math.PI*4)*4;
+        // Float: figure-8 drift pattern
+        var dx=Math.sin(t*Math.PI*2)*14;
+        var dy=Math.sin(t*Math.PI*4)*6;
         ctx.translate(cx+dx,cy+dy);
 
         // Rounded clip

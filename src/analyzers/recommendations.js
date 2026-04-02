@@ -83,12 +83,11 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
   const opusPct = totalModelCost > 0 ? Math.round((opusCost / totalModelCost) * 100) : 0;
 
   if (opusPct > 85) {
-    const savings = modelRouting?.estimatedSavings || Math.round(opusCost * 0.16);
     recs.push({
       severity: 'warning',
-      title: `${opusPct}% of spend is Opus`,
-      detail: `Opus costs 5x more than Sonnet per token. Sonnet 4.6 handles file reads, search, simple edits, and subagent work at the same quality. Community tip: switching routine tasks to Sonnet dropped quota usage by 60-80%.`,
-      action: `Set model: "sonnet" on subagent/Task calls. Estimated savings: ~$${savings.toLocaleString()}. Reserve Opus for complex reasoning only.`,
+      title: `${opusPct}% of your usage is Opus`,
+      detail: `Opus burns through your usage limit 5x faster than Sonnet per token. Sonnet 4.6 handles file reads, search, simple edits, and subagent work at the same quality. Community tip: routing routine tasks to Sonnet made usage limits last 3-5x longer.`,
+      action: `Set model: "sonnet" on subagent/Task calls. Your limits could last ${Math.round(100/opusPct * 3)}x longer. Reserve Opus for complex reasoning only.`,
     });
   }
 
