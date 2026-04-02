@@ -197,57 +197,83 @@ export function renderHTML(report) {
 
 <main class="pb-20 px-6 max-w-[1200px] mx-auto space-y-12">
 
-<!-- 2. SHARE CARD -->
-<section>
-  <div id="share-card" class="p-8 md:p-10 bg-[#1b1c1d] rounded-xl border border-[rgba(70,69,84,0.15)] relative overflow-hidden">
-
-    <!-- Top row: Grade + Label + Stats -->
-    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-      <div class="flex items-center gap-6">
-        <div class="w-20 h-20 flex items-center justify-center rounded-xl" style="background:${gradeColor}">
-          <span class="font-black text-4xl" style="color:#121315">${grade.letter}</span>
+<!-- 2. SHARE CARD — Credit Card Style -->
+<section class="flex flex-col items-center">
+  <style>
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    @keyframes float{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
+    .cc-card{
+      position:relative;width:100%;max-width:680px;aspect-ratio:1.586;
+      border-radius:20px;overflow:hidden;
+      background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
+      box-shadow:0 4px 24px rgba(0,0,0,0.5),0 0 0 1px rgba(192,193,255,0.08),0 40px 80px -20px rgba(0,0,0,0.8);
+      animation:float 6s ease-in-out infinite;
+      cursor:default;
+    }
+    .cc-card::before{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(105deg,transparent 30%,rgba(192,193,255,0.04) 45%,rgba(212,187,255,0.06) 50%,rgba(192,193,255,0.04) 55%,transparent 70%);
+      background-size:200% 100%;
+      animation:shimmer 4s ease-in-out infinite;
+      pointer-events:none;z-index:2;
+    }
+    .cc-card::after{
+      content:'';position:absolute;top:-50%;right:-50%;width:100%;height:100%;
+      background:radial-gradient(circle,rgba(192,193,255,0.06) 0%,transparent 60%);
+      pointer-events:none;z-index:1;
+    }
+    .cc-inner{position:relative;z-index:3;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;}
+  </style>
+  <div class="cc-card" id="share-card">
+    <div class="cc-inner">
+      <!-- Top: Grade badge + label -->
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 flex items-center justify-center rounded-[12px]" style="background:${gradeColor};box-shadow:0 0 20px ${gradeColor}30;">
+            <span class="font-black text-[28px]" style="color:#0f1018">${grade.letter}</span>
+          </div>
+          <div>
+            <span class="text-[9px] font-mono uppercase tracking-[0.08em] block" style="color:${gradeColor}">${grade.label}</span>
+            <span class="text-lg font-bold text-[#e3e2e3]">${gradeLabel}</span>
+          </div>
         </div>
-        <div>
-          <span class="text-[10px] font-mono uppercase tracking-[0.05em] block mb-1" style="color:${gradeColor}">Efficiency Rating</span>
-          <h2 class="text-2xl md:text-3xl font-black text-[#e3e2e3]">${gradeLabel}</h2>
+        <div class="text-right">
+          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#464554] block">CC Hubber</span>
         </div>
       </div>
-      <div class="flex gap-8 md:gap-12 flex-wrap">
+
+      <!-- Middle: Three big stats -->
+      <div class="flex justify-between items-end">
         <div>
-          <p class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] mb-1">Total Spend</p>
-          <p class="font-mono text-2xl md:text-3xl font-bold text-[#e3e2e3]" id="h-cost">${fmtCost(totalCost)}</p>
+          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Total Spend</p>
+          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none" id="h-cost">${fmtCost(totalCost)}</p>
         </div>
-        <div class="border-l border-[rgba(70,69,84,0.3)] pl-8 md:pl-12">
-          <p class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] mb-1">Active Days</p>
-          <p class="font-mono text-2xl md:text-3xl font-bold text-[#e3e2e3]" id="h-days">${activeDays}</p>
+        <div class="text-center">
+          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Active Days</p>
+          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none" id="h-days">${activeDays}</p>
         </div>
-        <div class="border-l border-[rgba(70,69,84,0.3)] pl-8 md:pl-12">
-          <p class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] mb-1">Cache Ratio</p>
-          <p class="font-mono text-2xl md:text-3xl font-bold text-[#e3e2e3]">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}</p>
+        <div class="text-right">
+          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Cache Ratio</p>
+          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}</p>
         </div>
       </div>
-    </div>
 
-    <!-- Diagnosis divider -->
-    <div class="mt-8 pt-6 border-t border-[rgba(70,69,84,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <p class="text-sm text-[#c7c4d7]">${diagnosisLine}</p>
-      <div class="flex items-center gap-4">
-        <span class="text-[10px] font-mono uppercase tracking-[0.05em] text-[#908fa0]">CC Hubber</span>
-        <span class="text-[10px] uppercase tracking-[0.05em] text-[#464554]">shipped fast with Mover OS</span>
+      <!-- Bottom: Diagnosis + branding -->
+      <div class="flex justify-between items-end">
+        <p class="text-[11px] text-[#908fa0] max-w-[70%]">${diagnosisLine}</p>
+        <span class="text-[8px] uppercase tracking-[0.12em] text-[#464554]">shipped fast with Mover OS</span>
       </div>
     </div>
   </div>
 
   <!-- Export button -->
-  <div class="flex justify-center mt-4">
-    <button id="btn-png" class="px-5 py-2.5 border border-[rgba(70,69,84,0.3)] rounded-xl text-sm font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
+  <div class="flex justify-center mt-5 gap-3">
+    <button id="btn-png" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
       <span class="material-symbols-outlined text-sm">download</span>
       Save as PNG
     </button>
   </div>
 </section>
-
-${oauthUsage ? renderRateLimits(oauthUsage) : ''}
 
 ${inflection && inflection.multiplier >= 1.5 ? `
 <!-- Inflection callout -->
@@ -374,7 +400,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     ${sessionIntel?.hourDistribution ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-lg font-bold text-[#e3e2e3] mb-4">Activity by Hour</h3>
-      <div class="gap-[3px]" id="hour-grid" style="display:grid;grid-template-columns:repeat(24,1fr);"></div>
+      <div class="" id="hour-grid" style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 4px;"></div>
       <div class="flex justify-between mt-2 text-[9px] font-mono text-[#908fa0]">
         <span>00:00</span>
         <span>06:00</span>
@@ -419,13 +445,14 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     ${recommendations.length > 0 ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-xl font-bold text-[#e3e2e3] mb-6">Recommendations</h3>
-      <div class="space-y-4">
-        ${recommendations.map(r => {
+      <div class="space-y-3">
+        ${recommendations.slice(0, 4).map(r => {
           const sev = sevColorMap[r.severity] || sevColorMap.info;
-          return `<div class="p-4 bg-[#0d0e0f] rounded-r-xl" style="border-left:4px solid ${sev.border}">
-            <p class="text-xs font-bold text-[#e3e2e3] mb-1">${r.title}</p>
-            <p class="text-[11px] text-[#c7c4d7] mb-2">${r.detail}</p>
-            <p class="text-[11px] font-semibold" style="color:${sev.text}">&rarr; ${r.action}</p>
+          return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
+            <div class="flex-1 min-w-0">
+              <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
+              <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${r.action}</p>
+            </div>
           </div>`;
         }).join('')}
       </div>
@@ -588,17 +615,22 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   function fc(n){return n>=100?'$'+Math.round(n).toLocaleString():'$'+n.toFixed(2)}
   function ft(n){return n>=1e9?(n/1e9).toFixed(1)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toString()}
 
-  // Hour heatmap
+  // Hour activity — vertical bar chart
   if(HR){
     var hg=document.getElementById('hour-grid');
     if(hg){
       var mx=Math.max.apply(null,HR);
       var html='';
       for(var i=0;i<24;i++){
-        var intensity=mx>0?HR[i]/mx:0;
-        // Stitch palette: primary #c0c1ff at varying opacity
-        var opac=intensity>0.8?'0.9':intensity>0.6?'0.7':intensity>0.4?'0.5':intensity>0.2?'0.3':intensity>0.05?'0.15':'0.05';
-        html+='<div style="height:28px;border-radius:3px;background:rgba(192,193,255,'+opac+')" title="'+i+':00 — '+HR[i]+' messages"></div>';
+        var pct=mx>0?Math.max(HR[i]/mx*100,2):2;
+        var opac=pct>70?'0.85':pct>40?'0.6':pct>15?'0.35':'0.12';
+        html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;" title="'+i+':00 — '+HR[i]+' messages">';
+        html+='<div style="width:3px;height:80px;background:rgba(70,69,84,0.2);border-radius:2px;position:relative;overflow:hidden;">';
+        html+='<div style="position:absolute;bottom:0;width:100%;height:'+pct+'%;background:rgba(192,193,255,'+opac+');border-radius:2px;"></div>';
+        html+='</div>';
+        if(i%6===0)html+='<span style="font-size:9px;font-family:JetBrains Mono,monospace;color:#464554;">'+i+'h</span>';
+        else html+='<span style="font-size:9px;color:transparent;">.</span>';
+        html+='</div>';
       }
       hg.innerHTML=html;
     }
