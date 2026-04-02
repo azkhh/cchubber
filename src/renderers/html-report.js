@@ -206,7 +206,7 @@ export function renderHTML(report) {
       position:relative;width:100%;max-width:680px;aspect-ratio:1.586;
       border-radius:20px;overflow:hidden;
       background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
-      box-shadow:0 4px 24px rgba(0,0,0,0.5),0 0 0 1px rgba(192,193,255,0.08),0 40px 80px -20px rgba(0,0,0,0.8);
+      box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(192,193,255,0.1),0 60px 100px -30px rgba(0,0,0,0.9),0 0 60px -10px rgba(192,193,255,0.04);
       animation:float 6s ease-in-out infinite;
       cursor:default;
     }
@@ -258,19 +258,28 @@ export function renderHTML(report) {
         </div>
       </div>
 
-      <!-- Bottom: Diagnosis + branding -->
-      <div class="flex justify-between items-end">
-        <p class="text-[11px] text-[#908fa0] max-w-[70%]">${diagnosisLine}</p>
-        <span class="text-[8px] uppercase tracking-[0.12em] text-[#464554]">shipped fast with Mover OS</span>
+      <!-- Bottom: Diagnosis + branding line -->
+      <div>
+        <p class="text-[11px] text-[#908fa0] mb-4">${diagnosisLine}</p>
+        <div class="flex items-center gap-2 text-[11px] font-mono tracking-[0.04em]">
+          <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff] transition-colors" style="text-decoration:none;">CC Hubber</a>
+          <span class="text-[#464554]">&middot;</span>
+          <span class="text-[#908fa0]">shipped fast with</span>
+          <a href="https://moveros.dev" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff] transition-colors" style="text-decoration:none;">Mover OS</a>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Export button -->
+  <!-- Export buttons -->
   <div class="flex justify-center mt-5 gap-3">
     <button id="btn-png" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
-      <span class="material-symbols-outlined text-sm">download</span>
-      Save as PNG
+      <span class="material-symbols-outlined text-sm">image</span>
+      Save PNG
+    </button>
+    <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
+      <span class="material-symbols-outlined text-sm">gif_box</span>
+      Save GIF
     </button>
   </div>
 </section>
@@ -401,13 +410,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-lg font-bold text-[#e3e2e3] mb-4">Activity by Hour</h3>
       <div class="" id="hour-grid" style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 4px;"></div>
-      <div class="flex justify-between mt-2 text-[9px] font-mono text-[#908fa0]">
-        <span>00:00</span>
-        <span>06:00</span>
-        <span>12:00</span>
-        <span>18:00</span>
-        <span>23:00</span>
-      </div>
+      <!-- labels rendered by JS -->
     </div>` : ''}
   </div>
 
@@ -606,6 +609,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 <script>
 (function(){
   var D=${dailyCostsJSON}, P=${projectsJSON};
@@ -628,8 +632,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         html+='<div style="width:3px;height:80px;background:rgba(70,69,84,0.2);border-radius:2px;position:relative;overflow:hidden;">';
         html+='<div style="position:absolute;bottom:0;width:100%;height:'+pct+'%;background:rgba(192,193,255,'+opac+');border-radius:2px;"></div>';
         html+='</div>';
-        if(i%6===0)html+='<span style="font-size:9px;font-family:JetBrains Mono,monospace;color:#464554;">'+i+'h</span>';
-        else html+='<span style="font-size:9px;color:transparent;">.</span>';
+        html+='<span style="font-size:8px;font-family:JetBrains Mono,monospace;color:'+(i%6===0?'#908fa0':'#464554')+';">'+i+'</span>';
         html+='</div>';
       }
       hg.innerHTML=html;
@@ -742,23 +745,99 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
   document.querySelectorAll('.cfilt').forEach(function(b){b.addEventListener('click',function(){setR(b.dataset.r)})});
 
-  // PNG/GIF export
-  var pb=document.getElementById('btn-png'),toast=document.getElementById('toast');
-  if(pb)pb.addEventListener('click',function(){
+  // Export helpers
+  var toast=document.getElementById('toast');
+  function showToast(m){if(!toast)return;toast.textContent=m;toast.classList.add('on');setTimeout(function(){toast.classList.remove('on')},2000)}
+
+  function captureCard(){
     var card=document.getElementById('share-card');
-    if(!card||typeof html2canvas==='undefined')return;
-    pb.innerHTML='<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Exporting...';pb.disabled=true;
-    html2canvas(card,{backgroundColor:'#121315',scale:2,useCORS:true,logging:false}).then(function(c){
-      var a=document.createElement('a');a.download='cchubber.png';a.href=c.toDataURL('image/png');a.click();
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as PNG';
-      pb.disabled=false;showToast('Saved to downloads');
+    if(!card||typeof html2canvas==='undefined')return Promise.reject();
+    // Pause animation for clean capture
+    card.style.animation='none';
+    card.style.transform='perspective(800px) rotateY(0deg) rotateX(0deg)';
+    return html2canvas(card,{backgroundColor:'#0f1018',scale:2,useCORS:true,logging:false,borderRadius:20}).then(function(c){
+      card.style.animation='';card.style.transform='';
+      // Draw rounded corners onto canvas
+      var w=c.width,h=c.height,r=40; // 20px * scale 2
+      var ctx=c.getContext('2d');
+      ctx.globalCompositeOperation='destination-in';
+      ctx.beginPath();
+      ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
+      ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);
+      ctx.lineTo(r,h);ctx.quadraticCurveTo(0,h,0,h-r);
+      ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+      ctx.fill();ctx.globalCompositeOperation='source-over';
+      return c;
+    });
+  }
+
+  // PNG export
+  var pb=document.getElementById('btn-png');
+  if(pb)pb.addEventListener('click',function(){
+    pb.textContent='Exporting...';pb.disabled=true;
+    captureCard().then(function(c){
+      var a=document.createElement('a');a.download='cchubber-card.png';a.href=c.toDataURL('image/png');a.click();
+      pb.innerHTML='<span class="material-symbols-outlined text-sm">image</span> Save PNG';
+      pb.disabled=false;showToast('PNG saved');
     }).catch(function(){
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as PNG';
-      pb.disabled=false;showToast('Export failed');
+      pb.innerHTML='<span class="material-symbols-outlined text-sm">image</span> Save PNG';
+      pb.disabled=false;showToast('Failed');
     });
   });
 
-  function showToast(m){if(!toast)return;toast.textContent=m;toast.classList.add('on');setTimeout(function(){toast.classList.remove('on')},2000)}
+  // GIF export — captures card with shimmer animation frames
+  var gb=document.getElementById('btn-gif');
+  if(gb)gb.addEventListener('click',function(){
+    if(typeof GIF==='undefined'){showToast('GIF library failed to load');return}
+    gb.textContent='Recording...';gb.disabled=true;
+    var card=document.getElementById('share-card');
+    if(!card){gb.textContent='Save GIF';gb.disabled=false;return}
+
+    // Capture multiple frames with shimmer at different positions
+    var gif=new GIF({workers:2,quality:8,width:0,height:0,workerScript:'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'});
+    var totalFrames=20;var frameDelay=100;var frameIdx=0;
+
+    function captureFrame(){
+      if(frameIdx>=totalFrames){
+        gb.textContent='Encoding...';
+        gif.render();
+        return;
+      }
+      // Shift shimmer position per frame
+      var pct=-200+((frameIdx/totalFrames)*400);
+      var shimEl=card.querySelector('.cc-inner');
+      if(shimEl)card.style.backgroundPosition=pct+'% 0';
+
+      card.style.animation='none';
+      card.style.transform='perspective(800px) rotateY('+(Math.sin(frameIdx/totalFrames*Math.PI*2)*3)+'deg) rotateX('+(Math.cos(frameIdx/totalFrames*Math.PI*2)*1.5)+'deg)';
+
+      html2canvas(card,{backgroundColor:'#0f1018',scale:1.5,useCORS:true,logging:false}).then(function(c){
+        // Round corners
+        var w=c.width,h=c.height,r=30;
+        var ctx=c.getContext('2d');
+        ctx.globalCompositeOperation='destination-in';
+        ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(w-r,0);ctx.quadraticCurveTo(w,0,w,r);
+        ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);ctx.lineTo(r,h);ctx.quadraticCurveTo(0,h,0,h-r);
+        ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);ctx.fill();ctx.globalCompositeOperation='source-over';
+
+        if(frameIdx===0){gif.options.width=w;gif.options.height=h}
+        gif.addFrame(c,{delay:frameDelay,copy:true});
+        frameIdx++;
+        setTimeout(captureFrame,50);
+      }).catch(function(){frameIdx=totalFrames;captureFrame()});
+    }
+
+    gif.on('finished',function(blob){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.download='cchubber-card.gif';a.href=url;a.click();
+      URL.revokeObjectURL(url);
+      card.style.animation='';card.style.transform='';
+      gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save GIF';
+      gb.disabled=false;showToast('GIF saved');
+    });
+
+    captureFrame();
+  });
 
   setR('all');
 })();
