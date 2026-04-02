@@ -242,7 +242,7 @@ export function renderHTML(report) {
   <div class="flex justify-center mt-4">
     <button id="btn-png" class="px-5 py-2.5 border border-[rgba(70,69,84,0.3)] rounded-xl text-sm font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
       <span class="material-symbols-outlined text-sm">download</span>
-      Save as GIF
+      Save as PNG
     </button>
   </div>
 </section>
@@ -374,7 +374,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     ${sessionIntel?.hourDistribution ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-lg font-bold text-[#e3e2e3] mb-4">Activity by Hour</h3>
-      <div class="grid grid-cols-24 gap-1" id="hour-grid"></div>
+      <div class="gap-[3px]" id="hour-grid" style="display:grid;grid-template-columns:repeat(24,1fr);"></div>
       <div class="flex justify-between mt-2 text-[9px] font-mono text-[#908fa0]">
         <span>00:00</span>
         <span>06:00</span>
@@ -492,36 +492,46 @@ ${anomalies.hasAnomalies ? `
 </section>
 ` : ''}
 
-<!-- 10. CLAUDE.md ANALYSIS -->
+<!-- 10. CLAUDE.md ANALYSIS — Global only, section breakdown -->
 <section class="bg-[#1b1c1d] rounded-xl border border-[rgba(70,69,84,0.15)] overflow-hidden">
-  <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)]">
+  <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)] flex justify-between items-center">
     <h3 class="text-xl font-bold text-[#e3e2e3]">CLAUDE.md Analysis</h3>
+    <div class="text-right">
+      <span class="font-mono text-sm text-[#e3e2e3]">${claudeMdStack.files[0]?.lineCount || '?'} lines</span>
+      <span class="text-[#908fa0] mx-2">&middot;</span>
+      <span class="font-mono text-sm text-[#e3e2e3]">~${claudeMdStack.totalTokensEstimate.toLocaleString()} tokens</span>
+      <span class="text-[#908fa0] mx-2">&middot;</span>
+      <span class="font-mono text-sm text-[#e3e2e3]">${(claudeMdStack.totalBytes / 1024).toFixed(1)} KB</span>
+    </div>
   </div>
+  <div class="px-8 py-4 bg-[#0d0e0f] border-b border-[rgba(70,69,84,0.15)] flex justify-between text-xs">
+    <span class="text-[#908fa0]">Per-message cost impact</span>
+    <span class="font-mono">
+      <span class="text-[#c0c1ff]">$${claudeMdStack.costPerMessage.cached.toFixed(4)}</span> cached &middot;
+      <span class="text-[#ffb690]">$${claudeMdStack.costPerMessage.uncached.toFixed(4)}</span> uncached &middot;
+      <span class="text-[#ffb4ab]">$${(claudeMdStack.costPerMessage.dailyCached200 || 0).toFixed(2)}</span>/day at 200 msgs
+    </span>
+  </div>
+  ${claudeMdStack.globalSections && claudeMdStack.globalSections.length > 0 ? `
   <div class="overflow-x-auto">
     <table class="w-full text-left">
       <thead class="bg-[#0d0e0f] border-b border-[rgba(70,69,84,0.15)]">
         <tr>
-          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">File</th>
-          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Size</th>
-          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Tokens</th>
+          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Section</th>
+          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Lines</th>
+          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Tokens</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-[rgba(70,69,84,0.15)]">
-        ${claudeMdStack.files.map(f => `<tr class="tbl-row">
-          <td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]">${f.level}</td>
-          <td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">${(f.bytes / 1024).toFixed(1)} KB</td>
-          <td class="px-8 py-4 font-mono text-sm text-[#c7c4d7] text-right">${f.tokensEstimate.toLocaleString()}</td>
+        ${claudeMdStack.globalSections.slice(0, 12).map(s => `<tr class="tbl-row">
+          <td class="px-8 py-3 text-sm text-[#e3e2e3]">${s.name}</td>
+          <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.lines}</td>
+          <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.tokens.toLocaleString()}</td>
         </tr>`).join('')}
-        <tr class="tbl-row bg-[#0d0e0f]">
-          <td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]">Per-message cost</td>
-          <td colspan="2" class="px-8 py-4 font-mono text-sm text-[#c7c4d7] text-right">
-            <span class="text-[#c0c1ff]">$${claudeMdStack.costPerMessage.cached.toFixed(4)}</span> cached /
-            <span class="text-[#ffb690]">$${claudeMdStack.costPerMessage.uncached.toFixed(4)}</span> uncached
-          </td>
-        </tr>
       </tbody>
     </table>
   </div>
+  ` : ''}
 </section>
 
 <!-- 11. CACHE SAVINGS -->
@@ -588,7 +598,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         var intensity=mx>0?HR[i]/mx:0;
         // Stitch palette: primary #c0c1ff at varying opacity
         var opac=intensity>0.8?'0.9':intensity>0.6?'0.7':intensity>0.4?'0.5':intensity>0.2?'0.3':intensity>0.05?'0.15':'0.05';
-        html+='<div class="aspect-square rounded-sm" style="background:rgba(192,193,255,'+opac+')" title="'+i+':00 - '+HR[i]+' messages"></div>';
+        html+='<div style="height:28px;border-radius:3px;background:rgba(192,193,255,'+opac+')" title="'+i+':00 — '+HR[i]+' messages"></div>';
       }
       hg.innerHTML=html;
     }
@@ -708,10 +718,10 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     pb.innerHTML='<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Exporting...';pb.disabled=true;
     html2canvas(card,{backgroundColor:'#121315',scale:2,useCORS:true,logging:false}).then(function(c){
       var a=document.createElement('a');a.download='cchubber.png';a.href=c.toDataURL('image/png');a.click();
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as GIF';
+      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as PNG';
       pb.disabled=false;showToast('Saved to downloads');
     }).catch(function(){
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as GIF';
+      pb.innerHTML='<span class="material-symbols-outlined text-sm">download</span> Save as PNG';
       pb.disabled=false;showToast('Export failed');
     });
   });

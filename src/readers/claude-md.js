@@ -6,15 +6,41 @@ export function readClaudeMdStack(claudeDir) {
   const home = homedir();
   const stack = [];
 
-  // Global CLAUDE.md
+  // Global CLAUDE.md — detailed section analysis
   const globalPath = join(home, '.claude', 'CLAUDE.md');
+  let globalSections = [];
   if (existsSync(globalPath)) {
     const stat = statSync(globalPath);
+    const content = readFileSync(globalPath, 'utf-8');
+    const lines = content.split('\n');
+    const lineCount = lines.length;
+
+    // Parse sections (## headings)
+    let currentSection = { name: 'Header', lines: 0, bytes: 0 };
+    const sections = [];
+    for (const line of lines) {
+      if (line.match(/^##\s+/)) {
+        if (currentSection.lines > 0) sections.push(currentSection);
+        currentSection = { name: line.replace(/^#+\s*/, '').trim(), lines: 0, bytes: 0 };
+      }
+      currentSection.lines++;
+      currentSection.bytes += Buffer.byteLength(line + '\n', 'utf-8');
+    }
+    if (currentSection.lines > 0) sections.push(currentSection);
+
+    // Add token estimates and sort by size
+    globalSections = sections
+      .map(s => ({ ...s, tokens: Math.round(s.bytes / 4) }))
+      .sort((a, b) => b.bytes - a.bytes);
+
     stack.push({
       level: 'global',
       path: globalPath,
       bytes: stat.size,
       tokensEstimate: Math.round(stat.size / 4),
+      lineCount,
+      sectionCount: sections.length,
+      sections: globalSections,
     });
   }
 
@@ -54,6 +80,7 @@ export function readClaudeMdStack(claudeDir) {
 
   return {
     files: stack,
+    globalSections,
     totalBytes,
     totalTokensEstimate,
     settingsBytes: settingsSize,

@@ -112,17 +112,7 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     });
   }
 
-  // 8. .claudeignore missing — community tip
-  if (claudeMdStack.totalTokensEstimate > 5000) {
-    recs.push({
-      severity: 'info',
-      title: 'Create a .claudeignore file',
-      detail: 'Claude Code reads your project structure on every context load. Excluding node_modules/, dist/, *.lock, __pycache__/, and build artifacts prevents compound token waste.',
-      action: 'Create .claudeignore in your project root: node_modules/\\ndist/\\n*.lock\\n*.min.js\\n__pycache__/\\ntarget/',
-    });
-  }
-
-  // 9. Cost anomalies
+  // 8. Cost anomalies
   if (anomalies.hasAnomalies) {
     const spikes = anomalies.anomalies.filter(a => a.type === 'spike');
     if (spikes.length > 0) {
@@ -136,17 +126,7 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     }
   }
 
-  // 10. --resume warning
-  if (cacheHealth.efficiencyRatio > 800) {
-    recs.push({
-      severity: 'info',
-      title: 'Avoid --resume on older versions',
-      detail: 'The --resume and --continue flags caused full prompt-cache misses on every resume in v2.1.69-2.1.89. Cost: ~$0.15 per resume on a 500K token conversation. Fixed in v2.1.90.',
-      action: 'If on v2.1.90+, --resume is safe. Otherwise, copy your last message and start a new session instead.',
-    });
-  }
-
-  // 11. Positive: cache savings
+  // 9. Positive: cache savings
   if (cacheHealth.savings?.fromCaching > 100) {
     recs.push({
       severity: 'positive',
@@ -156,15 +136,6 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     });
   }
 
-  // 12. Cost trend
-  if (anomalies.trend === 'rising_fast') {
-    recs.push({
-      severity: 'critical',
-      title: 'Costs rising sharply',
-      detail: 'Your recent 7-day average is significantly higher than historical. Multiple users reported 10x faster consumption after the April 1 update.',
-      action: 'Immediate: claude update. Then: start fresh sessions, avoid --resume, check MCP tool count. If persists, report to github.com/anthropics/claude-code/issues.',
-    });
-  }
-
-  return recs;
+  // Cap at 5 most impactful recommendations
+  return recs.slice(0, 5);
 }

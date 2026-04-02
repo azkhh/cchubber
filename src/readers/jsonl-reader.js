@@ -36,28 +36,13 @@ function readProjectsDir(dir, entries) {
     for (const hash of projectHashes) {
       const projectDir = join(dir, hash);
 
-      // 1. Read top-level JSONL files (one per session)
+      // Read top-level JSONL files only (one per session).
+      // Subagent files in <session>/subagents/ are NOT read for cost —
+      // parent session JSONL already includes subagent token billing.
+      // Reading both would double-count (confirmed: $5.7K → $10.8K).
       const jsonlFiles = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
       for (const file of jsonlFiles) {
         readJsonlFile(join(projectDir, file), basename(file, '.jsonl'), hash, entries);
-      }
-
-      // 2. Read subagent JSONL files inside session UUID directories
-      // Structure: <project_hash>/<session_uuid>/subagents/agent-*.jsonl
-      const subdirs = readdirSync(projectDir).filter(f => {
-        try { return statSync(join(projectDir, f)).isDirectory(); } catch { return false; }
-      });
-
-      for (const subdir of subdirs) {
-        const subagentDir = join(projectDir, subdir, 'subagents');
-        if (existsSync(subagentDir)) {
-          try {
-            const subFiles = readdirSync(subagentDir).filter(f => f.endsWith('.jsonl'));
-            for (const file of subFiles) {
-              readJsonlFile(join(subagentDir, file), basename(file, '.jsonl'), hash, entries);
-            }
-          } catch { /* skip */ }
-        }
       }
     }
   } catch {
