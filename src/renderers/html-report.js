@@ -201,7 +201,7 @@ export function renderHTML(report) {
 <section class="flex flex-col items-center">
   <style>
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-    @keyframes float{0%,100%{transform:translateX(-8px)}50%{transform:translateX(8px)}}
+    @keyframes float{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
     .cc-card{
       position:relative;width:100%;max-width:740px;
       border-radius:22px;overflow:hidden;
@@ -795,69 +795,83 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     });
   });
 
-  // Video export — screen-records the actual CSS-animated card element
+  // Video export — 1080p canvas animation with shimmer + float
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
     gb.textContent='Recording...';gb.disabled=true;
-    var card=document.getElementById('share-card');
-    if(!card){gb.textContent='Save Video';gb.disabled=false;return}
 
-    // Create a wrapper div that crops just the card area with padding
-    var wrapper=document.createElement('div');
-    wrapper.style.cssText='position:fixed;top:0;left:0;width:'+(card.offsetWidth+100)+'px;height:'+(card.offsetHeight+100)+'px;background:#000000;display:flex;align-items:center;justify-content:center;z-index:99999;';
+    captureCard().then(function(cardImg){
+      // 1080p canvas with card centered on black
+      var VW=1920,VH=1080;
+      var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
+      var ctx=canvas.getContext('2d');
 
-    // Clone the card into the wrapper so it has the same CSS animations
-    var clone=card.cloneNode(true);
-    clone.removeAttribute('id');
-    clone.style.animation='float 4s ease-in-out infinite';
-    clone.style.boxShadow='0 25px 50px -12px rgba(0,0,0,0.8)';
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
+      // Scale card to fit nicely in frame (80% of height)
+      var targetH=VH*0.75;
+      var scale=targetH/cardImg.height;
+      var cw=cardImg.width*scale,ch=cardImg.height*scale;
+      var cx=(VW-cw)/2,cy=(VH-ch)/2;
+      var r=22*scale; // border radius scaled
 
-    // Use html2canvas in a loop? No — use screen capture of the wrapper
-    // Actually, use a canvas + repeated html2canvas calls
-    // Simpler: just offer to screen-record via native API
-    // Most reliable: use the page's own rendering via an iframe approach
+      var stream=canvas.captureStream(30);
+      var chunks=[];
+      var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:15000000});
+      recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+      recorder.onstop=function(){
+        var blob=new Blob(chunks,{type:'video/webm'});
+        var a=document.createElement('a');a.download='cchubber-card.webm';
+        a.href=URL.createObjectURL(blob);a.click();
+        gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
+        gb.disabled=false;showToast('Video saved');
+      };
 
-    // Simplest reliable approach: record the wrapper using setInterval + html2canvas frames
-    var chunks=[];
-    var cw=parseInt(wrapper.style.width),ch=parseInt(wrapper.style.height);
-    var canvas=document.createElement('canvas');canvas.width=cw*2;canvas.height=ch*2;
-    var canvasCtx=canvas.getContext('2d');
-    var stream=canvas.captureStream(0);
-    var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-    var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:10000000});
-    recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
-    recorder.onstop=function(){
-      wrapper.remove();
-      var blob=new Blob(chunks,{type:'video/webm'});
-      var a=document.createElement('a');a.download='cchubber-card.webm';
-      a.href=URL.createObjectURL(blob);a.click();
+      var fps=30,duration=4,totalFrames=fps*duration,frame=0;
+      recorder.start();
+
+      var timer=setInterval(function(){
+        if(frame>=totalFrames){clearInterval(timer);setTimeout(function(){recorder.stop()},200);return}
+
+        var t=frame/totalFrames;
+        var ease=Math.sin(t*Math.PI*2); // smooth oscillation
+
+        // Black background
+        ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
+
+        ctx.save();
+        // Float: gentle perspective-like movement
+        var dx=ease*12;
+        var dy=Math.cos(t*Math.PI*4)*4;
+        ctx.translate(cx+dx,cy+dy);
+
+        // Rounded clip
+        ctx.beginPath();
+        ctx.moveTo(r,0);ctx.lineTo(cw-r,0);ctx.quadraticCurveTo(cw,0,cw,r);
+        ctx.lineTo(cw,ch-r);ctx.quadraticCurveTo(cw,ch,cw-r,ch);ctx.lineTo(r,ch);
+        ctx.quadraticCurveTo(0,ch,0,ch-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+        ctx.closePath();ctx.clip();
+
+        // Draw card
+        ctx.drawImage(cardImg,0,0,cw,ch);
+
+        // Shimmer sweep (one full pass over 4 seconds)
+        var shimX=-cw*0.4+t*cw*1.8;
+        var g=ctx.createLinearGradient(shimX,0,shimX+cw*0.25,ch);
+        g.addColorStop(0,'rgba(255,255,255,0)');
+        g.addColorStop(0.4,'rgba(192,193,255,0.04)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.1)');
+        g.addColorStop(0.6,'rgba(212,187,255,0.04)');
+        g.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=g;ctx.fillRect(0,0,cw,ch);
+
+        ctx.restore();
+        frame++;
+      },1000/fps);
+
+    }).catch(function(){
       gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-      gb.disabled=false;showToast('Video saved');
-    };
-
-    recorder.start(100);
-    var frameCount=0;var maxFrames=30; // ~30 captures over 4 seconds
-
-    function captureVideoFrame(){
-      if(frameCount>=maxFrames){
-        setTimeout(function(){recorder.stop()},300);
-        return;
-      }
-      html2canvas(wrapper,{backgroundColor:'#000000',scale:2,useCORS:true,logging:false}).then(function(snap){
-        canvasCtx.clearRect(0,0,canvas.width,canvas.height);
-        canvasCtx.drawImage(snap,0,0,canvas.width,canvas.height);
-        try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
-        frameCount++;
-        setTimeout(captureVideoFrame,133); // ~7.5 fps html2canvas (slow but real CSS)
-      }).catch(function(){
-        frameCount=maxFrames;captureVideoFrame();
-      });
-    }
-
-    // Give CSS animation a moment to start
-    setTimeout(captureVideoFrame,200);
+      gb.disabled=false;showToast('Failed');
+    });
   });
 
   setR('all');
