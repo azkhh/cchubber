@@ -35,12 +35,17 @@ function calculateCost(modelName, tokens) {
   return { input, output, cacheWrite, cacheRead, total: input + output + cacheWrite + cacheRead };
 }
 
-export function analyzeUsage(statsCache, sessionMeta, days) {
+export function analyzeUsage(statsCache, sessionMeta, days, dailyFromJSONL, modelFromJSONL) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
   const cutoffStr = cutoffDate.toISOString().split('T')[0];
 
-  // Calculate per-day costs from stats cache
+  // PRIMARY: Use JSONL aggregated data (has actual token counts, we calculate costs)
+  if (dailyFromJSONL && dailyFromJSONL.length > 0) {
+    return analyzeFromJSONL(dailyFromJSONL, modelFromJSONL, sessionMeta, days, cutoffStr);
+  }
+
+  // FALLBACK: Use stats-cache (less detailed)
   const dailyCosts = [];
   let totalCost = 0;
   let totalInput = 0;
@@ -195,6 +200,106 @@ function median(arr) {
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function analyzeFromJSONL(dailyFromJSONL, modelFromJSONL, sessionMeta, days, cutoffStr) {
+  const filtered = dailyFromJSONL.filter(d => d.date >= cutoffStr);
+
+  // Calculate costs from token counts (costUSD is 0 for Max plan users)
+  const dailyCosts = filtered.map(d => {
+    let dayCost = 0;
+    const modelBreakdowns = [];
+
+    for (const [modelName, m] of Object.entries(d.models)) {
+      const cost = calculateCost(modelName, {
+        inputTokens: m.inputTokens,
+        outputTokens: m.outputTokens,
+        cacheCreationTokens: m.cacheCreationTokens,
+        cacheReadTokens: m.cacheReadTokens,
+      });
+      dayCost += cost.total;
+      modelBreakdowns.push({
+        model: modelName,
+        cost: cost.total,
+        tokens: {
+          input: m.inputTokens,
+          output: m.outputTokens,
+          cacheRead: m.cacheReadTokens,
+          cacheWrite: m.cacheCreationTokens,
+        },
+      });
+    }
+
+    return {
+      date: d.date,
+      cost: dayCost,
+      outputTokens: d.outputTokens,
+      cacheReadTokens: d.cacheReadTokens,
+      cacheOutputRatio: d.cacheOutputRatio,
+      messageCount: d.messageCount,
+      sessionCount: d.sessionCount,
+      models: modelBreakdowns,
+    };
+  });
+
+  const activeDays = dailyCosts.filter(d => d.cost > 0.01).length;
+
+  // Model cost breakdown
+  const modelCosts = {};
+  for (const [name, m] of Object.entries(modelFromJSONL || {})) {
+    const cost = calculateCost(name, {
+      inputTokens: m.inputTokens,
+      outputTokens: m.outputTokens,
+      cacheCreationTokens: m.cacheCreationTokens,
+      cacheReadTokens: m.cacheReadTokens,
+    });
+    modelCosts[cleanModelName(name)] = cost.total;
+  }
+
+  // Session analysis
+  const recentSessions = (sessionMeta || []).filter(s => {
+    if (!s.startTime) return true;
+    return s.startTime >= cutoffStr;
+  });
+
+  const totalSessions = recentSessions.length;
+  const avgSessionDuration = totalSessions > 0
+    ? recentSessions.reduce((sum, s) => sum + s.durationMinutes, 0) / totalSessions
+    : 0;
+
+  const periodCost = dailyCosts.reduce((sum, d) => sum + d.cost, 0);
+  const avgDailyCost = activeDays > 0 ? periodCost / activeDays : 0;
+  const peakDay = dailyCosts.reduce((max, d) => d.cost > (max?.cost || 0) ? d : max, null);
+
+  // Totals
+  const totalInput = filtered.reduce((s, d) => s + d.inputTokens, 0);
+  const totalOutput = filtered.reduce((s, d) => s + d.outputTokens, 0);
+  const totalCacheRead = filtered.reduce((s, d) => s + d.cacheReadTokens, 0);
+  const totalCacheWrite = filtered.reduce((s, d) => s + d.cacheCreationTokens, 0);
+
+  return {
+    periodDays: days,
+    activeDays,
+    totalCost: periodCost,
+    avgDailyCost,
+    medianDailyCost: median(dailyCosts.filter(d => d.cost > 0.01).map(d => d.cost)),
+    peakDay,
+    dailyCosts,
+    modelCosts,
+    sessions: {
+      total: totalSessions,
+      avgDurationMinutes: avgSessionDuration,
+      totalLinesAdded: recentSessions.reduce((s, x) => s + x.linesAdded, 0),
+      totalLinesRemoved: recentSessions.reduce((s, x) => s + x.linesRemoved, 0),
+      totalFilesModified: recentSessions.reduce((s, x) => s + x.filesModified, 0),
+    },
+    totals: {
+      inputTokens: totalInput,
+      outputTokens: totalOutput,
+      cacheReadTokens: totalCacheRead,
+      cacheWriteTokens: totalCacheWrite,
+    },
+  };
 }
 
 export { PRICING, calculateCost, cleanModelName };

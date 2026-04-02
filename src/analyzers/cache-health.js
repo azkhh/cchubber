@@ -1,4 +1,4 @@
-export function analyzeCacheHealth(statsCache, cacheBreaks, days) {
+export function analyzeCacheHealth(statsCache, cacheBreaks, days, dailyFromJSONL) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
 
@@ -24,7 +24,16 @@ export function analyzeCacheHealth(statsCache, cacheBreaks, days) {
   let totalInput = 0;
   let totalOutput = 0;
 
-  if (statsCache?.modelUsage) {
+  // Use JSONL data if available (more accurate), fallback to stats-cache
+  if (dailyFromJSONL && dailyFromJSONL.length > 0) {
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    for (const day of dailyFromJSONL.filter(d => d.date >= cutoffStr)) {
+      totalCacheRead += day.cacheReadTokens || 0;
+      totalCacheWrite += day.cacheCreationTokens || 0;
+      totalInput += day.inputTokens || 0;
+      totalOutput += day.outputTokens || 0;
+    }
+  } else if (statsCache?.modelUsage) {
     for (const usage of Object.values(statsCache.modelUsage)) {
       totalCacheRead += usage.cacheReadInputTokens || 0;
       totalCacheWrite += usage.cacheCreationInputTokens || 0;

@@ -76,28 +76,34 @@ async function main() {
   console.log('  Reading local Claude Code data...\n');
 
   // Read all data sources
+  const jsonlEntries = readAllJSONL(claudeDir);
   const statsCache = readStatsCache(claudeDir);
   const sessionMeta = readSessionMeta(claudeDir);
   const cacheBreaks = readCacheBreaks(claudeDir);
   const claudeMdStack = readClaudeMdStack(claudeDir);
   const oauthUsage = await readOAuthUsage(claudeDir);
 
-  if (!statsCache && sessionMeta.length === 0) {
+  if (jsonlEntries.length === 0 && !statsCache) {
     console.error('  ✗ No usage data found. Use Claude Code first, then run CC Hubber.\n');
     process.exit(1);
   }
 
-  console.log('  ✓ Stats cache loaded');
+  // Aggregate JSONL into daily + model views (primary data source)
+  const dailyFromJSONL = aggregateDaily(jsonlEntries);
+  const modelFromJSONL = aggregateByModel(jsonlEntries);
+
+  console.log(`  ✓ ${jsonlEntries.length.toLocaleString()} conversation entries parsed`);
+  console.log(`  ✓ ${dailyFromJSONL.length} days of data found`);
   console.log(`  ✓ ${sessionMeta.length} sessions found`);
   console.log(`  ✓ ${cacheBreaks.length} cache break events found`);
   console.log(`  ✓ CLAUDE.md stack: ${claudeMdStack.totalTokensEstimate.toLocaleString()} tokens (~${(claudeMdStack.totalBytes / 1024).toFixed(1)} KB)`);
   if (oauthUsage) console.log('  ✓ Live rate limits loaded');
   else console.log('  ○ Live rate limits skipped (no OAuth token)');
 
-  // Analyze
+  // Analyze — use JSONL aggregations as primary data, stats-cache as fallback
   console.log('\n  Analyzing...\n');
-  const costAnalysis = analyzeUsage(statsCache, sessionMeta, flags.days);
-  const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, flags.days);
+  const costAnalysis = analyzeUsage(statsCache, sessionMeta, flags.days, dailyFromJSONL, modelFromJSONL);
+  const cacheHealth = analyzeCacheHealth(statsCache, cacheBreaks, flags.days, dailyFromJSONL);
   const anomalies = detectAnomalies(costAnalysis);
   const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies);
 
