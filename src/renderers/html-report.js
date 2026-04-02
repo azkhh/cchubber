@@ -795,80 +795,105 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     });
   });
 
-  // Video export — 1080p canvas animation with shimmer + float
+  // Video export — 1080p, high quality, smooth animation
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
     gb.textContent='Recording...';gb.disabled=true;
+    var card=document.getElementById('share-card');
+    if(!card){gb.textContent='Save Video';gb.disabled=false;return}
 
-    captureCard().then(function(cardImg){
-      // 1080p canvas with card centered on black
+    // Wait for fonts then capture at exact video resolution
+    document.fonts.ready.then(function(){
+      card.style.animation='none';card.style.transform='none';
+      var ew=card.offsetWidth,eh=card.offsetHeight;
+
+      // Target: card fills ~80% of 1080p width
       var VW=1920,VH=1080;
-      var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
-      var ctx=canvas.getContext('2d');
+      var targetW=VW*0.78;
+      var vidScale=targetW/ew;
+      var cw=Math.round(ew*vidScale),ch=Math.round(eh*vidScale);
+      var captureScale=vidScale; // capture at exact needed resolution
 
-      // Scale card to fit 1080p frame with padding
-      var targetH=VH*0.7;
-      var scale=targetH/cardImg.height;
-      if(cardImg.width*scale>VW*0.85)scale=(VW*0.85)/cardImg.width;
-      var cw=Math.round(cardImg.width*scale),ch=Math.round(cardImg.height*scale);
-      var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
-      var r=Math.round(22*scale);
+      return html2canvas(card,{
+        backgroundColor:null,scale:captureScale,useCORS:true,logging:false,
+        width:ew,height:eh,windowWidth:ew+100,
+      }).then(function(raw){
+        card.style.animation='';card.style.transform='';
 
-      var stream=canvas.captureStream(30);
-      var chunks=[];
-      var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-      var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:15000000});
-      recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
-      recorder.onstop=function(){
-        var blob=new Blob(chunks,{type:'video/webm'});
-        var a=document.createElement('a');a.download='cchubber-card.webm';
-        a.href=URL.createObjectURL(blob);a.click();
-        gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-        gb.disabled=false;showToast('Video saved');
-      };
+        // raw is now exactly cw x ch pixels — no rescaling needed
+        var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
+        var r=Math.round(22*captureScale);
 
-      var fps=30,duration=4,totalFrames=fps*duration,frame=0;
-      recorder.start();
+        var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
+        var ctx=canvas.getContext('2d');
+        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
 
-      var timer=setInterval(function(){
-        if(frame>=totalFrames){clearInterval(timer);setTimeout(function(){recorder.stop()},200);return}
+        var stream=canvas.captureStream(0);
+        var chunks=[];
+        var mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+        var recorder=new MediaRecorder(stream,{mimeType:mimeType,videoBitsPerSecond:20000000});
+        recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+        recorder.onstop=function(){
+          var blob=new Blob(chunks,{type:'video/webm'});
+          var a=document.createElement('a');a.download='cchubber-card.webm';
+          a.href=URL.createObjectURL(blob);a.click();
+          gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
+          gb.disabled=false;showToast('Video saved');
+        };
 
-        var t=frame/totalFrames;
+        var duration=4000,startTime=null;
+        recorder.start(50);
 
-        // Black background
-        ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
+        function animate(timestamp){
+          if(!startTime)startTime=timestamp;
+          var elapsed=timestamp-startTime;
+          if(elapsed>=duration){
+            try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
+            setTimeout(function(){recorder.stop()},200);
+            return;
+          }
 
-        ctx.save();
-        // Float: figure-8 drift pattern
-        var dx=Math.sin(t*Math.PI*2)*14;
-        var dy=Math.sin(t*Math.PI*4)*6;
-        ctx.translate(cx+dx,cy+dy);
+          var t=elapsed/duration;
+          // Smooth eased float matching CSS ease-in-out
+          var ease=0.5-0.5*Math.cos(t*Math.PI*2);
+          var dx=(ease-0.5)*20; // gentle horizontal drift
+          var dy=Math.sin(t*Math.PI*4)*5; // subtle vertical bob
 
-        // Rounded clip
-        ctx.beginPath();
-        ctx.moveTo(r,0);ctx.lineTo(cw-r,0);ctx.quadraticCurveTo(cw,0,cw,r);
-        ctx.lineTo(cw,ch-r);ctx.quadraticCurveTo(cw,ch,cw-r,ch);ctx.lineTo(r,ch);
-        ctx.quadraticCurveTo(0,ch,0,ch-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-        ctx.closePath();ctx.clip();
+          ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
 
-        // Draw card
-        ctx.drawImage(cardImg,0,0,cw,ch);
+          ctx.save();
+          ctx.translate(cx+dx,cy+dy);
 
-        // Shimmer sweep (one full pass over 4 seconds)
-        var shimX=-cw*0.4+t*cw*1.8;
-        var g=ctx.createLinearGradient(shimX,0,shimX+cw*0.25,ch);
-        g.addColorStop(0,'rgba(255,255,255,0)');
-        g.addColorStop(0.4,'rgba(192,193,255,0.04)');
-        g.addColorStop(0.5,'rgba(255,255,255,0.1)');
-        g.addColorStop(0.6,'rgba(212,187,255,0.04)');
-        g.addColorStop(1,'rgba(255,255,255,0)');
-        ctx.fillStyle=g;ctx.fillRect(0,0,cw,ch);
+          // Rounded clip
+          ctx.beginPath();
+          ctx.moveTo(r,0);ctx.lineTo(cw-r,0);ctx.quadraticCurveTo(cw,0,cw,r);
+          ctx.lineTo(cw,ch-r);ctx.quadraticCurveTo(cw,ch,cw-r,ch);ctx.lineTo(r,ch);
+          ctx.quadraticCurveTo(0,ch,0,ch-r);ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+          ctx.closePath();ctx.clip();
 
-        ctx.restore();
-        frame++;
-      },1000/fps);
+          // Draw card at native resolution (no scaling = no blur)
+          ctx.drawImage(raw,0,0);
 
+          // Shimmer
+          var sx=-cw*0.4+t*cw*1.8;
+          var g=ctx.createLinearGradient(sx,0,sx+cw*0.2,ch);
+          g.addColorStop(0,'rgba(255,255,255,0)');
+          g.addColorStop(0.45,'rgba(192,193,255,0.04)');
+          g.addColorStop(0.5,'rgba(255,255,255,0.08)');
+          g.addColorStop(0.55,'rgba(212,187,255,0.04)');
+          g.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.fillStyle=g;ctx.fillRect(0,0,cw,ch);
+
+          ctx.restore();
+
+          try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
+          requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+      });
     }).catch(function(){
+      card.style.animation='';card.style.transform='';
       gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
       gb.disabled=false;showToast('Failed');
     });
