@@ -2,7 +2,12 @@ import https from 'https';
 import { platform, arch, homedir, cpus, totalmem, freemem } from 'os';
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { execSync as rawExec } from 'child_process';
+
+// Suppress stderr output on Windows (prevents "system cannot find path" spam)
+function execSync(cmd, opts = {}) {
+  return rawExec(cmd, { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'], ...opts });
+}
 
 // Anonymous usage telemetry — no PII, no tokens, no file contents.
 // Opt out: npx cchubber --no-telemetry
@@ -364,14 +369,14 @@ function gatherEnvironmentData() {
 
     // Git project signals (no URLs, no names — just metrics)
     try {
-      data.gitCommitCount = parseInt(execSync('git rev-list --count HEAD 2>/dev/null', {encoding:'utf-8',timeout:3000}).trim()) || 0;
-      data.gitBranchCount = parseInt(execSync('git branch --list 2>/dev/null | wc -l', {encoding:'utf-8',timeout:3000}).trim()) || 0;
-      data.gitContributors = parseInt(execSync('git shortlog -sn --all 2>/dev/null | wc -l', {encoding:'utf-8',timeout:3000}).trim()) || 0;
-      const lastCommit = execSync('git log -1 --format=%ct 2>/dev/null', {encoding:'utf-8',timeout:3000}).trim();
+      data.gitCommitCount = parseInt(execSync('git rev-list --count HEAD 2>/dev/null', {}).trim()) || 0;
+      data.gitBranchCount = parseInt(execSync('git branch --list 2>/dev/null | wc -l', {}).trim()) || 0;
+      data.gitContributors = parseInt(execSync('git shortlog -sn --all 2>/dev/null | wc -l', {}).trim()) || 0;
+      const lastCommit = execSync('git log -1 --format=%ct 2>/dev/null', {}).trim();
       data.daysSinceLastCommit = lastCommit ? Math.round((Date.now()/1000 - parseInt(lastCommit)) / 86400) : null;
       data.gitHost = (() => {
         try {
-          const url = execSync('git remote get-url origin 2>/dev/null', {encoding:'utf-8',timeout:3000}).trim();
+          const url = execSync('git remote get-url origin 2>/dev/null', {}).trim();
           if (url.includes('github.com')) return 'github';
           if (url.includes('gitlab')) return 'gitlab';
           if (url.includes('bitbucket')) return 'bitbucket';
@@ -384,7 +389,7 @@ function gatherEnvironmentData() {
     // File type distribution (language signals — count only, no names)
     try {
       const countExt = (ext) => {
-        try { return parseInt(execSync(`find . -maxdepth 4 -name "*.${ext}" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" 2>/dev/null | wc -l`, {encoding:'utf-8',timeout:3000}).trim()) || 0; } catch { return 0; }
+        try { return parseInt(execSync(`find . -maxdepth 4 -name "*.${ext}" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" 2>/dev/null | wc -l`, {}).trim()) || 0; } catch { return 0; }
       };
       data.filesByType = {
         js: countExt('js'), ts: countExt('ts'), tsx: countExt('tsx'), jsx: countExt('jsx'),
@@ -397,7 +402,7 @@ function gatherEnvironmentData() {
 
     // JSONL total size (how much CC data they have)
     try {
-      const totalJSONLSize = parseInt(execSync(`find "${join(claudeDir, 'projects')}" -name "*.jsonl" -not -path "*/subagents/*" 2>/dev/null -exec stat --format="%s" {} + 2>/dev/null | awk '{s+=$1}END{print s}'`, {encoding:'utf-8',timeout:5000}).trim()) || 0;
+      const totalJSONLSize = parseInt(execSync(`find "${join(claudeDir, 'projects')}" -name "*.jsonl" -not -path "*/subagents/*" 2>/dev/null -exec stat --format="%s" {} + 2>/dev/null | awk '{s+=$1}END{print s}'`, {}).trim()) || 0;
       data.jsonlTotalMB = Math.round(totalJSONLSize / 1048576);
     } catch { data.jsonlTotalMB = 0; }
 
@@ -499,7 +504,7 @@ function gatherEnvironmentData() {
     }
 
     // OS version
-    try { data.osVersion = execSync('ver 2>/dev/null || uname -r 2>/dev/null', {encoding:'utf-8',timeout:2000}).trim().slice(0,50); } catch {}
+    try { data.osVersion = execSync('ver 2>/dev/null || uname -r 2>/dev/null', {}).trim().slice(0,50); } catch {}
 
     // Workspace scale
     try {
