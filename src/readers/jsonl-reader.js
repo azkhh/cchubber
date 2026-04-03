@@ -36,19 +36,36 @@ function readProjectsDir(dir, entries) {
     for (const hash of projectHashes) {
       const projectDir = join(dir, hash);
 
-      // Read top-level JSONL files only (one per session).
-      // Subagent files in <session>/subagents/ are NOT read for cost —
-      // parent session JSONL already includes subagent token billing.
-      // Reading both would double-count (confirmed: $5.7K → $10.8K).
+      // Read top-level JSONL files (one per session)
       const jsonlFiles = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
       for (const file of jsonlFiles) {
         readJsonlFile(join(projectDir, file), basename(file, '.jsonl'), hash, entries);
+      }
+
+      // Read subagent JSONL files (for Haiku/Sonnet model attribution)
+      // Dedup by message ID prevents double-counting
+      const subdirs = readdirSync(projectDir).filter(f => {
+        try { return statSync(join(projectDir, f)).isDirectory(); } catch { return false; }
+      });
+      for (const subdir of subdirs) {
+        const subagentDir = join(projectDir, subdir, 'subagents');
+        if (existsSync(subagentDir)) {
+          try {
+            const subFiles = readdirSync(subagentDir).filter(f => f.endsWith('.jsonl'));
+            for (const file of subFiles) {
+              readJsonlFile(join(subagentDir, file), basename(file, '.jsonl'), hash, entries);
+            }
+          } catch { /* skip */ }
+        }
       }
     }
   } catch {
     // Directory read failed
   }
 }
+
+// Track seen message IDs to deduplicate (JSONL files contain dupes from session resume)
+const seenMessageIds = new Set();
 
 function readJsonlFile(filePath, sessionId, projectHash, entries) {
   try {
@@ -64,6 +81,13 @@ function readJsonlFile(filePath, sessionId, projectHash, entries) {
 
         const usage = record.message?.usage;
         if (!usage) continue;
+
+        // Deduplicate by message ID — JSONL files contain duplicates from session resume
+        const msgId = record.message?.id;
+        if (msgId) {
+          if (seenMessageIds.has(msgId)) continue;
+          seenMessageIds.add(msgId);
+        }
 
         entries.push({
           sessionId,
