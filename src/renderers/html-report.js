@@ -487,8 +487,9 @@ ${inflection && inflection.multiplier >= 1.5 ? `
 <!-- 7. PROJECTS TABLE -->
 ${projectBreakdown && projectBreakdown.length > 0 ? `
 <section class="bg-[#1b1c1d] rounded-xl border border-[rgba(70,69,84,0.15)] overflow-hidden">
-  <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)]">
+  <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)] flex justify-between items-center">
     <h3 class="text-xl font-bold text-[#e3e2e3]">Projects</h3>
+    <button id="toggle-paths" onclick="document.querySelectorAll('.proj-name,.proj-path').forEach(e=>e.style.filter=e.style.filter?'':'blur(8px)');this.textContent=this.textContent==='Hide names'?'Show names':'Hide names'" class="text-[10px] font-mono text-[#908fa0] px-3 py-1 border border-[rgba(70,69,84,0.3)] rounded cursor-pointer hover:text-[#e3e2e3]">Hide names</button>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left" id="proj-tbl">
@@ -675,8 +676,8 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     for(var i=0;i<P.length;i++){
       var p=P[i];
       h+='<tr class="tbl-row">';
-      h+='<td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]">'+p.name;
-      if(p.path)h+='<br><span class="text-[10px] text-[#908fa0] font-mono">'+p.path+'</span>';
+      h+='<td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]"><span class="proj-name">'+p.name+'</span>';
+      if(p.path)h+='<br><span class="proj-path text-[10px] text-[#908fa0] font-mono">'+p.path+'</span>';
       h+='</td>';
       h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">'+p.messages.toLocaleString()+'</td>';
       h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">'+p.sessions+'</td>';
