@@ -21,6 +21,7 @@ export function renderHTML(report) {
   })));
 
   const fmtCost = (n) => '$' + (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(2));
+  const fmtDuration = (m) => m >= 120 ? Math.round(m/60) + 'h' : m >= 60 ? (m/60).toFixed(1) + 'h' : m + 'm';
 
   // Grade color mapping to Stitch palette
   const gradeColorMap = {
@@ -312,8 +313,8 @@ ${inflection && inflection.multiplier >= 1.5 ? `
   </div>
   <div class="p-6 bg-[#0d0e0f]">
     <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3">Cache Breaks</span>
-    <span class="font-mono text-2xl font-bold block text-[#e3e2e3]">${cacheHealth.totalCacheBreaks || 0}</span>
-    <span class="text-[10px] text-[#908fa0] mt-1 block">${cacheHealth.reasonsRanked?.[0]?.reason || 'None detected'}</span>
+    <span class="font-mono text-2xl font-bold block text-[#e3e2e3]">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.totalCacheBreaks : '~' + (cacheHealth.estimatedBreaks || 0)}</span>
+    <span class="text-[10px] text-[#908fa0] mt-1 block">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.reasonsRanked?.[0]?.reason : 'estimated from writes'}</span>
   </div>
   <div class="p-6 bg-[#0d0e0f]">
     <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3">CLAUDE.md</span>
@@ -361,15 +362,15 @@ ${inflection && inflection.multiplier >= 1.5 ? `
       <div class="grid grid-cols-3 gap-6 mb-8">
         <div>
           <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-1">Median</span>
-          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${sessionIntel.medianDuration}m</span>
+          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${fmtDuration(sessionIntel.medianDuration)}</span>
         </div>
         <div>
           <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-1">P90</span>
-          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${sessionIntel.p90Duration}m</span>
+          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${fmtDuration(sessionIntel.p90Duration)}</span>
         </div>
         <div>
           <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-1">Longest</span>
-          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${sessionIntel.maxDuration}m</span>
+          <span class="font-mono text-xl font-bold text-[#e3e2e3]">${fmtDuration(sessionIntel.maxDuration)}</span>
         </div>
       </div>
       <div class="grid grid-cols-3 gap-6 mb-8">

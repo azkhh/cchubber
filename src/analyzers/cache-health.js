@@ -57,13 +57,20 @@ export function analyzeCacheHealth(statsCache, cacheBreaks, days, dailyFromJSONL
   // With cache: reads are $0.50/M
   const savingsFromCache = totalCacheRead / 1_000_000 * (5.0 - 0.50);
 
-  // Cost wasted from cache breaks (rough estimate)
-  // Each cache break forces a full re-read at write price ($6.25/M) instead of read price ($0.50/M)
-  // Estimate ~200K tokens re-cached per break
-  const wastedFromBreaks = totalBreaks * 200_000 / 1_000_000 * (6.25 - 0.50);
+  // Cost wasted from cache rewrites
+  // Cache writes happen when cache is invalidated — costs 12.5x more than reads
+  // Use actual cache write tokens as the signal (more reliable than diff file count)
+  const wastedFromBreaks = totalBreaks > 0
+    ? totalBreaks * 200_000 / 1_000_000 * (6.25 - 0.50)
+    : totalCacheWrite / 1_000_000 * (6.25 - 0.50); // estimate from write tokens
+
+  // If no diff files but cache writes exist, estimate break count
+  // Each break re-caches ~200K-500K tokens on average
+  const estimatedBreaks = totalBreaks > 0 ? totalBreaks : Math.round(totalCacheWrite / 300_000);
 
   return {
     totalCacheBreaks: totalBreaks,
+    estimatedBreaks,
     reasonsRanked,
     cacheHitRate: Math.round(cacheHitRate * 10) / 10,
     efficiencyRatio,
