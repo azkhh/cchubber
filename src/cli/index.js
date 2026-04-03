@@ -39,7 +39,7 @@ const flags = {
 if (flags.help) {
   console.log(`
   ╔═══════════════════════════════════════════════╗
-  ║              CC Hubber v0.1.0                 ║
+  ║              CC Hubber v0.3.0                 ║
   ║  What you spent. Why you spent it. Is that    ║
   ║  normal.                                      ║
   ╚═══════════════════════════════════════════════╝
@@ -74,7 +74,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('\n  CC Hubber v0.1.0');
+  console.log('\n  CC Hubber v0.3.0');
   console.log('  ─────────────────────────────');
   console.log('  Reading local Claude Code data...\n');
 
