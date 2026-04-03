@@ -224,7 +224,7 @@ export function renderHTML(report) {
       background-size:128px 128px;
     }
     .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;min-height:280px;}
-    .cc-card.no-shimmer::before,.cc-card.no-shimmer::after{display:none!important;}
+    .cc-card.no-shimmer::before{display:none!important;}
   </style>
   <div class="cc-card" id="share-card-html">
     <div class="cc-inner">
@@ -912,7 +912,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             gb.disabled=false;showToast('Video saved ('+ext.toUpperCase()+')');
           };
 
-          var duration=6000,startTime=null; // 6 sec — matches CSS animation cycle
+          // Pre-generate noise texture to fight gradient banding
+          var noiseC=document.createElement('canvas');noiseC.width=256;noiseC.height=256;
+          var nctx=noiseC.getContext('2d');
+          var ndata=nctx.createImageData(256,256);
+          for(var ni=0;ni<ndata.data.length;ni+=4){var v=Math.random()*255;ndata.data[ni]=v;ndata.data[ni+1]=v;ndata.data[ni+2]=v;ndata.data[ni+3]=8;}
+          nctx.putImageData(ndata,0,0);
+
+          var duration=6000,startTime=null;
           recorder.start(100);
 
           function frame(ts){
@@ -949,6 +956,10 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             g.addColorStop(0.7,'rgba(212,187,255,0.04)');
             g.addColorStop(1,'rgba(255,255,255,0)');
             vctx.fillStyle=g;vctx.fillRect(0,0,cw,ch);
+
+            // Noise dither — breaks up gradient banding from video compression
+            var pat=vctx.createPattern(noiseC,'repeat');
+            vctx.fillStyle=pat;vctx.globalAlpha=0.4;vctx.fillRect(0,0,cw,ch);vctx.globalAlpha=1;
 
             vctx.restore();
             requestAnimationFrame(frame);
