@@ -930,16 +930,12 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             var t=elapsed/duration;
             // Gentle breathe + float — matches the natural feel of the CSS animation
             // ease-in-out via cosine (same curve as CSS ease-in-out)
-            var ease=0.5-0.5*Math.cos(t*Math.PI*2);
-            var scaleAmt=1+ease*0.018; // breathe: 1.0 to 1.018
-            var floatX=(ease-0.5)*12; // +-6px horizontal drift
-            var floatY=Math.sin(t*Math.PI*4)*4; // subtle vertical bob
+            // Pure horizontal drift — no zoom, no bob, just lateral movement
+            var drift=Math.sin(t*Math.PI*2)*14; // +-14px, smooth sine, matches rotateY feel
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
-            vctx.translate(VW/2+floatX,VH/2+floatY);
-            vctx.scale(scaleAmt,scaleAmt);
-            vctx.translate(-cw/2,-ch/2);
+            vctx.translate(Math.round((VW-cw)/2+drift),Math.round((VH-ch)/2));
 
             // Draw the HTML-captured card image (browser-quality)
             vctx.drawImage(img,0,0,cw,ch);
