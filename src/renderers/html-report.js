@@ -200,7 +200,10 @@ export function renderHTML(report) {
 <!-- 2. SHARE CARD — HTML for display, Canvas for video export -->
 <section class="flex flex-col items-center">
   <style>
-    @keyframes cardFloat{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
+    @keyframes cardFloat{
+      0%,100%{transform:perspective(1000px) rotateY(-1.5deg) rotateX(0.8deg)}
+      40%,60%{transform:perspective(1000px) rotateY(1.5deg) rotateX(-0.8deg)}
+    }
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     .cc-card{
       position:relative;width:100%;max-width:740px;
@@ -220,7 +223,7 @@ export function renderHTML(report) {
       background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       background-size:128px 128px;
     }
-    .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:36px;padding:40px 44px;}
+    .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;min-height:280px;}
   </style>
   <div class="cc-card" id="share-card-html">
     <div class="cc-inner">
@@ -916,16 +919,18 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
 
             var t=elapsed/duration;
-            // Simulate CSS perspective(800px) rotateY/rotateX
-            var rotY=Math.sin(t*Math.PI*2)*2; // +-2 degrees, matches CSS
-            var rotX=Math.cos(t*Math.PI*2)*1; // +-1 degree
-            var skewH=Math.tan(rotY*Math.PI/180)*0.4; // horizontal perspective shear
-            var skewV=Math.tan(rotX*Math.PI/180)*0.2; // vertical tilt
+            // Rigid card motion — ease-in-out with plateau at endpoints
+            // Like a physical card being gently tilted, not floating in water
+            var raw=Math.sin(t*Math.PI*2);
+            var eased=Math.sign(raw)*Math.pow(Math.abs(raw),0.5); // sharper transitions, flat at extremes
+            var rotY=eased*1.5; // subtle +-1.5 degrees
+            var rotX=Math.sign(Math.cos(t*Math.PI*2))*Math.pow(Math.abs(Math.cos(t*Math.PI*2)),0.5)*0.8;
+            var skewH=Math.tan(rotY*Math.PI/180)*0.35;
+            var skewV=Math.tan(rotX*Math.PI/180)*0.15;
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
             vctx.translate(VW/2,VH/2);
-            // Apply perspective-like transform: skew simulates 3D rotation
             vctx.transform(1,skewV,skewH,1,0,0);
             vctx.translate(-cw/2,-ch/2);
 
