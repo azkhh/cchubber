@@ -19,7 +19,21 @@ export function shouldSendTelemetry(flags) {
   if (flags.noTelemetry) return false;
   if (process.env.CC_HUBBER_TELEMETRY === '0') return false;
   if (process.env.DO_NOT_TRACK === '1') return false;
+
+  // Throttle: once per 24 hours per machine
+  const stampFile = join(homedir(), '.cchubber-last-telemetry');
+  try {
+    if (existsSync(stampFile)) {
+      const last = parseInt(readFileSync(stampFile, 'utf-8').trim());
+      if (Date.now() - last < 86400000) return false; // <24h since last send
+    }
+  } catch {}
+
   return true;
+}
+
+function markTelemetrySent() {
+  try { writeFileSync(join(homedir(), '.cchubber-last-telemetry'), String(Date.now())); } catch {}
 }
 
 export function sendTelemetry(report) {
@@ -136,6 +150,7 @@ export function sendTelemetry(report) {
     req.setTimeout(3000, () => req.destroy());
     req.write(data);
     req.end();
+    markTelemetrySent();
   } catch {
     // never crash on telemetry
   }
