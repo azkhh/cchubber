@@ -450,7 +450,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-xl font-bold text-[#e3e2e3] mb-6">Recommendations</h3>
       <div class="space-y-3">
-        ${recommendations.slice(0, 4).map(r => {
+        ${recommendations.map(r => {
           const sev = sevColorMap[r.severity] || sevColorMap.info;
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
