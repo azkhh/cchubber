@@ -1,5 +1,8 @@
 # CC Hubber
 
+[![npm downloads](https://img.shields.io/npm/dt/cchubber?color=c0c1ff&label=installs)](https://www.npmjs.com/package/cchubber)
+[![npm version](https://img.shields.io/npm/v/cchubber?color=ffb690)](https://www.npmjs.com/package/cchubber)
+
 Your Claude Code usage, diagnosed. One command.
 
 ```bash

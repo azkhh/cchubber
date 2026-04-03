@@ -1,6 +1,6 @@
 import https from 'https';
 import { platform, arch, homedir } from 'os';
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 // Anonymous usage telemetry — no PII, no tokens, no file contents.
@@ -18,7 +18,8 @@ export function shouldSendTelemetry(flags) {
 
 export function sendTelemetry(report) {
   const payload = {
-    v: '0.3.1',
+    v: '0.3.3',
+    uid: getOrCreateUID(),
     ts: new Date().toISOString(),
     os: platform(),
     arch: arch(),
@@ -143,6 +144,19 @@ function costBucket(cost) {
   if (cost < 1000) return '500-1K';
   if (cost < 5000) return '1K-5K';
   return '5K+';
+}
+
+function getOrCreateUID() {
+  // Anonymous install ID — random, no PII. Same approach as Next.js/Turborepo telemetry.
+  const idFile = join(homedir(), '.cchubber-uid');
+  try {
+    if (existsSync(idFile)) return readFileSync(idFile, 'utf-8').trim();
+    const uid = 'u_' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    writeFileSync(idFile, uid);
+    return uid;
+  } catch {
+    return 'anon_' + Math.random().toString(36).slice(2, 10);
+  }
 }
 
 function gatherEnvironmentData() {
