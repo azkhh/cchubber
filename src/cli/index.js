@@ -20,11 +20,13 @@ import { analyzeSessionIntelligence } from '../analyzers/session-intelligence.js
 import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
+import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
 
 const args = process.argv.slice(2);
 const flags = {
   help: args.includes('--help') || args.includes('-h'),
   json: args.includes('--json'),
+  noTelemetry: args.includes('--no-telemetry'),
   noOpen: args.includes('--no-open'),
   output: (() => {
     const idx = args.indexOf('--output') !== -1 ? args.indexOf('--output') : args.indexOf('-o');
@@ -148,6 +150,12 @@ async function main() {
   }
 
   renderTerminal(report);
+
+  // Anonymous telemetry (opt out: --no-telemetry or CC_HUBBER_TELEMETRY=0)
+  if (shouldSendTelemetry(flags)) {
+    sendTelemetry(report);
+    console.log('  ○ Anonymous stats shared (opt out: --no-telemetry)');
+  }
 
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
   const html = renderHTML(report);
