@@ -42,12 +42,11 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
 
   // 2. CLAUDE.md bloat
   if (claudeMdStack.totalTokensEstimate > 8000) {
-    const excessTokens = claudeMdStack.totalTokensEstimate - 4000;
-    const savingsPct = Math.min(15, Math.round(excessTokens / claudeMdStack.totalTokensEstimate * 20));
+    const excessK = Math.round((claudeMdStack.totalTokensEstimate - 4000) / 1000);
     recs.push({
       severity: claudeMdStack.totalTokensEstimate > 15000 ? 'critical' : 'warning',
       title: `CLAUDE.md is ${Math.round(claudeMdStack.totalTokensEstimate / 1000)}K tokens — trim to <4K`,
-      savings: `~${savingsPct}% per-message reduction`,
+      savings: `saves ~${excessK}K tokens/msg`,
       action: 'Re-read on every turn. Move rarely-used rules to project files. Use skills/hooks instead of inline instructions. Community target: under 200 lines.',
     });
   }
@@ -121,7 +120,35 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     }
   }
 
-  // 9. Cache savings (positive)
+  // 9. Avoid --resume on older versions
+  if (cacheHealth.efficiencyRatio > 600) {
+    recs.push({
+      severity: 'info',
+      title: 'Avoid --resume and --continue flags',
+      savings: '~$0.15 saved per resume',
+      action: 'These flags caused full prompt-cache misses in v2.1.69-2.1.89 (~$0.15 per resume on 500K context). Fixed in v2.1.90. Copy your last message and start fresh instead.',
+    });
+  }
+
+  // 10. Specific prompt discipline
+  recs.push({
+    severity: 'info',
+    title: 'Be specific in prompts — reduces tokens up to 10x',
+    savings: '~20-40% usage reduction',
+    action: 'Instead of "fix the auth bug", say "fix JWT validation in src/auth/validate.ts line 42". Specific prompts avoid codebase-wide scans. Community-verified: 10x reduction per prompt.',
+  });
+
+  // 11. Disconnect unused MCP tools
+  if (sessionIntel?.available && sessionIntel.topTools.some(t => t.name.includes('mcp__'))) {
+    recs.push({
+      severity: 'info',
+      title: 'Disconnect unused MCP servers',
+      savings: '~5-15% per cache break avoided',
+      action: 'Each MCP tool schema change invalidates the prompt cache. Only connect servers you actively need. Disconnect the rest between sessions.',
+    });
+  }
+
+  // 12. Cache savings (positive)
   if (cacheHealth.savings?.fromCaching > 100) {
     recs.push({
       severity: 'positive',
@@ -131,5 +158,5 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     });
   }
 
-  return recs.slice(0, 6);
+  return recs.slice(0, 8);
 }

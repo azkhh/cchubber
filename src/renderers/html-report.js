@@ -279,10 +279,17 @@ export function renderHTML(report) {
 </section>
 
 ${inflection && inflection.multiplier >= 1.5 ? `
-<!-- Inflection callout -->
-<section class="p-6 bg-[#0d0e0f] border-l-4 border-[#ffb690] rounded-r-xl">
-  <p class="text-xs font-bold text-[#ffb690] uppercase tracking-[0.05em] mb-1">Inflection Point</p>
-  <p class="text-sm text-[#c7c4d7]">${inflection.summary}</p>
+<!-- Inflection callouts -->
+<section class="space-y-3">
+  <div class="p-6 bg-[#0d0e0f] border-l-4 rounded-r-xl" style="border-left-color:${inflection.direction === 'worsened' ? '#ffb4ab' : '#c0c1ff'}">
+    <p class="text-xs font-bold uppercase tracking-[0.05em] mb-1" style="color:${inflection.direction === 'worsened' ? '#ffb4ab' : '#c0c1ff'}">${inflection.direction === 'worsened' ? 'Degradation Detected' : 'Inflection Point'}</p>
+    <p class="text-sm text-[#c7c4d7]">${inflection.summary}</p>
+  </div>
+  ${inflection.secondary ? `
+  <div class="p-6 bg-[#0d0e0f] border-l-4 rounded-r-xl" style="border-left-color:${inflection.secondary.direction === 'worsened' ? '#ffb4ab' : '#c0c1ff'}">
+    <p class="text-xs font-bold uppercase tracking-[0.05em] mb-1" style="color:${inflection.secondary.direction === 'worsened' ? '#ffb4ab' : '#c0c1ff'}">${inflection.secondary.direction === 'worsened' ? 'Degradation Detected' : 'Recovery Detected'}</p>
+    <p class="text-sm text-[#c7c4d7]">${inflection.secondary.summary}</p>
+  </div>` : ''}
 </section>
 ` : ''}
 

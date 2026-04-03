@@ -1,7 +1,7 @@
 /**
  * Inflection Point Detection
- * Finds the sharpest change in cache efficiency ratio over time.
- * Outputs: "Your efficiency dropped 3.6x starting March 29. Before: 482:1. After: 1,726:1."
+ * Finds BOTH the worst degradation AND best improvement in cache efficiency.
+ * Prioritizes degradation — that's what users care about ("why is my usage draining?").
  */
 export function detectInflectionPoints(dailyFromJSONL) {
   if (!dailyFromJSONL || dailyFromJSONL.length < 5) return null;
@@ -12,10 +12,10 @@ export function detectInflectionPoints(dailyFromJSONL) {
 
   if (sorted.length < 5) return null;
 
-  // Sliding window: compare the average ratio of days before vs after each point
-  // Window size: at least 3 days on each side
   const minWindow = 3;
-  let bestSplit = null;
+  let worstDegradation = null;
+  let worstScore = 0;
+  let bestImprovement = null;
   let bestScore = 0;
 
   for (let i = minWindow; i <= sorted.length - minWindow; i++) {
@@ -27,32 +27,44 @@ export function detectInflectionPoints(dailyFromJSONL) {
 
     if (beforeRatio === 0 || afterRatio === 0) continue;
 
-    // Score = magnitude of change (either direction)
-    const changeMultiplier = afterRatio > beforeRatio
-      ? afterRatio / beforeRatio
-      : beforeRatio / afterRatio;
-
-    if (changeMultiplier > bestScore && changeMultiplier >= 1.5) {
-      bestScore = changeMultiplier;
-      bestSplit = {
-        date: sorted[i].date,
-        beforeRatio,
-        afterRatio,
-        multiplier: Math.round(changeMultiplier * 10) / 10,
-        direction: afterRatio > beforeRatio ? 'worsened' : 'improved',
-        beforeDays: before.length,
-        afterDays: after.length,
-      };
+    if (afterRatio > beforeRatio) {
+      // Degradation (ratio went UP = worse)
+      const mult = afterRatio / beforeRatio;
+      if (mult > worstScore && mult >= 1.5) {
+        worstScore = mult;
+        worstDegradation = buildResult(sorted[i].date, beforeRatio, afterRatio, mult, 'worsened', before.length, after.length);
+      }
+    } else {
+      // Improvement (ratio went DOWN = better)
+      const mult = beforeRatio / afterRatio;
+      if (mult > bestScore && mult >= 1.5) {
+        bestScore = mult;
+        bestImprovement = buildResult(sorted[i].date, beforeRatio, afterRatio, mult, 'improved', before.length, after.length);
+      }
     }
   }
 
-  if (!bestSplit) return null;
+  // Return degradation as primary (that's the problem), improvement as secondary
+  const primary = worstDegradation || bestImprovement;
+  if (!primary) return null;
 
-  // Build human-readable summary
-  const dirLabel = bestSplit.direction === 'worsened' ? 'dropped' : 'improved';
-  bestSplit.summary = `Your cache efficiency ${dirLabel} ${bestSplit.multiplier}x starting ${formatDate(bestSplit.date)}. Before: ${bestSplit.beforeRatio.toLocaleString()}:1. After: ${bestSplit.afterRatio.toLocaleString()}:1.`;
+  primary.secondary = worstDegradation ? bestImprovement : null;
+  return primary;
+}
 
-  return bestSplit;
+function buildResult(date, beforeRatio, afterRatio, multiplier, direction, beforeDays, afterDays) {
+  const mult = Math.round(multiplier * 10) / 10;
+  const dirLabel = direction === 'worsened' ? 'dropped' : 'improved';
+  return {
+    date,
+    beforeRatio,
+    afterRatio,
+    multiplier: mult,
+    direction,
+    beforeDays,
+    afterDays,
+    summary: `Your cache efficiency ${dirLabel} ${mult}x starting ${formatDate(date)}. Before: ${beforeRatio.toLocaleString()}:1. After: ${afterRatio.toLocaleString()}:1.`,
+  };
 }
 
 function computeRatio(days) {
