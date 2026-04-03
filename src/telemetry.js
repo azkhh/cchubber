@@ -7,7 +7,7 @@ import { join } from 'path';
 // Opt out: npx cchubber --no-telemetry
 // Or set env: CC_HUBBER_TELEMETRY=0
 
-const TELEMETRY_URL = process.env.CC_HUBBER_TELEMETRY_URL || 'https://cchubber-telemetry.azkhh.workers.dev/collect';
+const TELEMETRY_URL = process.env.CC_HUBBER_TELEMETRY_URL || 'https://cchubber-telemetry.asmirkhan087.workers.dev/collect';
 
 export function shouldSendTelemetry(flags) {
   if (flags.noTelemetry) return false;
