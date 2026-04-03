@@ -593,7 +593,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   </div>
 </footer>
 
-<!-- No capture libraries needed — card renders on canvas directly -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
 <script>
 (function(){
   var D=${dailyCostsJSON}, P=${projectsJSON};
@@ -857,65 +857,92 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   document.fonts.ready.then(function(){requestAnimationFrame(animateCard)});
 
   // ─── VIDEO EXPORT (records the same canvas) ──────
-  // Video export — records the share-card canvas directly at 1080p
-  // Same canvas, same renderer, perfect 1:1 match
+  // Video export — captures HTML card with html-to-image, animates on canvas at 1440p
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
-    gb.textContent='Recording...';gb.disabled=true;
+    gb.textContent='Capturing...';gb.disabled=true;
+    var htmlCard=document.getElementById('share-card-html');
+    if(!htmlCard||typeof htmlToImage==='undefined'){gb.textContent='Save Video';gb.disabled=false;showToast('Library not loaded');return}
 
-    // Create 1080p canvas, draw the card centered on black with animation
-    var VW=1920,VH=1080;
-    var vidCanvas=document.createElement('canvas');vidCanvas.width=VW;vidCanvas.height=VH;
-    var vctx=vidCanvas.getContext('2d');
+    // Pause CSS animation for clean capture
+    htmlCard.style.animation='none';htmlCard.style.transform='none';
 
-    // Scale card to fit 80% of 1080p width
-    var scale=Math.min((VW*0.78)/cardW,(VH*0.78)/cardH);
-    var cw=Math.round(cardW*scale),ch=Math.round(cardH*scale);
-    var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
+    document.fonts.ready.then(function(){
+      // Capture HTML card via SVG foreignObject (browser-quality rendering)
+      return htmlToImage.toPng(htmlCard,{quality:1,pixelRatio:3}).then(function(dataUrl){
+        htmlCard.style.animation='';htmlCard.style.transform='';
+        gb.textContent='Recording...';
 
-    var stream=vidCanvas.captureStream(30);
-    var chunks=[];
-    var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:25000000});
-    recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
-    recorder.onstop=function(){
-      var blob=new Blob(chunks,{type:'video/mp4'});
-      var a=document.createElement('a');a.download='cchubber-card.mp4';
-      a.href=URL.createObjectURL(blob);a.click();
+        var img=new Image();
+        img.onload=function(){
+          // 2560x1440 canvas
+          var VW=2560,VH=1440;
+          var vidCanvas=document.createElement('canvas');vidCanvas.width=VW;vidCanvas.height=VH;
+          var vctx=vidCanvas.getContext('2d');
+          vctx.imageSmoothingEnabled=true;vctx.imageSmoothingQuality='high';
+
+          // Scale card to ~78% of frame width
+          var scale=Math.min((VW*0.78)/img.width,(VH*0.78)/img.height);
+          var cw=Math.round(img.width*scale),ch=Math.round(img.height*scale);
+          var r=22*3*scale; // border radius
+
+          var stream=vidCanvas.captureStream(30);
+          var chunks=[];
+          var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:30000000});
+          recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+          recorder.onstop=function(){
+            var blob=new Blob(chunks,{type:'video/mp4'});
+            var a=document.createElement('a');a.download='cchubber-card.mp4';
+            a.href=URL.createObjectURL(blob);a.click();
+            gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
+            gb.disabled=false;showToast('Video saved');
+          };
+
+          var duration=6000,startTime=null;
+          recorder.start(50);
+
+          function frame(ts){
+            if(!startTime)startTime=ts;
+            var elapsed=ts-startTime;
+            if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
+
+            var t=elapsed/duration;
+            var phase=Math.sin(t*Math.PI*2);
+            var dx=phase*18;
+            var squeeze=1-Math.abs(phase)*0.005;
+
+            vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
+            vctx.save();
+            vctx.translate(VW/2+dx,VH/2);
+            vctx.scale(squeeze,1);
+            vctx.translate(-cw/2,-ch/2);
+
+            // Draw the HTML-captured card image (browser-quality)
+            vctx.drawImage(img,0,0,cw,ch);
+
+            // Shimmer overlay
+            var sx=-cw*0.4+(t%1)*cw*1.8;
+            var g=vctx.createLinearGradient(sx,0,sx+cw*0.25,ch);
+            g.addColorStop(0,'rgba(255,255,255,0)');
+            g.addColorStop(0.45,'rgba(192,193,255,0.03)');
+            g.addColorStop(0.5,'rgba(255,255,255,0.06)');
+            g.addColorStop(0.55,'rgba(212,187,255,0.03)');
+            g.addColorStop(1,'rgba(255,255,255,0)');
+            vctx.fillStyle=g;vctx.fillRect(0,0,cw,ch);
+
+            vctx.restore();
+            requestAnimationFrame(frame);
+          }
+
+          requestAnimationFrame(frame);
+        };
+        img.src=dataUrl;
+      });
+    }).catch(function(e){
+      htmlCard.style.animation='';htmlCard.style.transform='';
       gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
-      gb.disabled=false;showToast('Video saved');
-    };
-
-    var duration=6000,startTime=null;
-    recorder.start(50);
-
-    function vidFrame(ts){
-      if(!startTime)startTime=ts;
-      var elapsed=ts-startTime;
-      if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
-
-      var t=elapsed/duration;
-
-      // Draw card at video resolution using the same drawCard function
-      // Create a temp canvas at video card size, draw card onto it, then composite
-      var tmpC=document.createElement('canvas');tmpC.width=cw;tmpC.height=ch;
-      var tmpCtx=tmpC.getContext('2d');
-      tmpCtx.scale(scale,scale);
-      drawCard(tmpCtx,cardW,cardH,t);
-
-      // 1080p frame: black bg + card with gentle perspective float
-      var phase=Math.sin(t*Math.PI*2);
-      vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
-      vctx.save();
-      vctx.translate(VW/2+phase*14,VH/2);
-      vctx.scale(1-Math.abs(phase)*0.006,1);
-      vctx.translate(-cw/2,-ch/2);
-      vctx.drawImage(tmpC,0,0);
-      vctx.restore();
-
-      requestAnimationFrame(vidFrame);
-    }
-
-    requestAnimationFrame(vidFrame);
+      gb.disabled=false;showToast('Failed: '+e.message);
+    });
   });
 
   setR('all');
