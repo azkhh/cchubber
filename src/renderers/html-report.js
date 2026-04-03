@@ -205,7 +205,7 @@ export function renderHTML(report) {
     .cc-card{
       position:relative;width:100%;max-width:740px;
       border-radius:22px;overflow:hidden;
-      background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
+      background:linear-gradient(145deg,#1a1b2e 0%,#151622 20%,#0f1018 40%,#131428 55%,#191a2d 70%,#141520 85%,#12131f 100%);
       box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);
       animation:cardFloat 6s ease-in-out infinite;
     }
@@ -215,6 +215,11 @@ export function renderHTML(report) {
       background-size:200% 100%;animation:shimmer 4s ease-in-out infinite;
       pointer-events:none;z-index:2;
     }
+    .cc-card::after{
+      content:'';position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0.035;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size:128px 128px;
+    }
     .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:36px;padding:40px 44px;}
   </style>
   <div class="cc-card" id="share-card-html">
@@ -222,7 +227,7 @@ export function renderHTML(report) {
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-4">
           <div class="w-14 h-14 flex items-center justify-center rounded-[12px]" style="background:${gradeColor}">
-            <span class="font-black text-[28px]" style="color:#0f1018">${grade.letter}</span>
+            <span class="text-[30px]" style="color:#0f1018;font-weight:900;">${grade.letter}</span>
           </div>
           <div>
             <span class="text-[10px] font-mono uppercase tracking-[0.08em] font-bold block" style="color:${gradeColor}">${grade.label}</span>
