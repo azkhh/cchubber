@@ -15,7 +15,7 @@ export function renderHTML(report) {
     date: d.date, cost: d.cost, cacheOutputRatio: d.cacheOutputRatio || 0, isAnomaly: anomalyDates.has(d.date),
   })));
 
-  const projectsJSON = JSON.stringify((projectBreakdown || []).slice(0, 15).map(p => ({
+  const projectsJSON = JSON.stringify((projectBreakdown || []).map(p => ({
     name: p.name, path: p.path, messages: p.messageCount, sessions: p.sessionCount,
     input: p.inputTokens, output: p.outputTokens, cacheRead: p.cacheReadTokens, cacheWrite: p.cacheCreationTokens,
   })));
@@ -409,7 +409,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
       <div>
         <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-4">Top Tools Usage</span>
         <div class="space-y-3">
-          ${sessionIntel.topTools.slice(0, 6).map((t, i) => `
+          ${sessionIntel.topTools.slice(0, 10).map((t, i) => `
           <div class="space-y-1">
             <div class="flex justify-between text-[11px] font-mono">
               <span class="text-[#c7c4d7]">${t.name}</span>
@@ -672,7 +672,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   if(ptb&&P.length>0){
     P.sort(function(a,b){return(b.output/1e6*OUT+b.cacheRead/1e6*CACHE_R)-(a.output/1e6*OUT+a.cacheRead/1e6*CACHE_R)});
     var h='';
-    for(var i=0;i<Math.min(P.length,10);i++){
+    for(var i=0;i<P.length;i++){
       var p=P[i];
       h+='<tr class="tbl-row">';
       h+='<td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]">'+p.name;
