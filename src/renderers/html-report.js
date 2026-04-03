@@ -201,8 +201,8 @@ export function renderHTML(report) {
 <section class="flex flex-col items-center">
   <style>
     @keyframes cardFloat{
-      0%,100%{transform:perspective(1000px) rotateY(-1.5deg) rotateX(0.8deg)}
-      40%,60%{transform:perspective(1000px) rotateY(1.5deg) rotateX(-0.8deg)}
+      0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}
+      50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}
     }
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     .cc-card{
@@ -910,7 +910,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             gb.disabled=false;showToast('Video saved ('+ext.toUpperCase()+')');
           };
 
-          var duration=4000,startTime=null; // 4 sec — short enough for all platforms
+          var duration=6000,startTime=null; // 6 sec — matches CSS animation cycle
           recorder.start(100);
 
           function frame(ts){
@@ -919,19 +919,17 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
 
             var t=elapsed/duration;
-            // Rigid card motion — ease-in-out with plateau at endpoints
-            // Like a physical card being gently tilted, not floating in water
-            var raw=Math.sin(t*Math.PI*2);
-            var eased=Math.sign(raw)*Math.pow(Math.abs(raw),0.5); // sharper transitions, flat at extremes
-            var rotY=eased*1.5; // subtle +-1.5 degrees
-            var rotX=Math.sign(Math.cos(t*Math.PI*2))*Math.pow(Math.abs(Math.cos(t*Math.PI*2)),0.5)*0.8;
-            var skewH=Math.tan(rotY*Math.PI/180)*0.35;
-            var skewV=Math.tan(rotX*Math.PI/180)*0.15;
+            // Gentle breathe + float — matches the natural feel of the CSS animation
+            // ease-in-out via cosine (same curve as CSS ease-in-out)
+            var ease=0.5-0.5*Math.cos(t*Math.PI*2);
+            var scaleAmt=1+ease*0.012; // breathe: 1.0 to 1.012
+            var floatX=(ease-0.5)*8; // +-4px horizontal drift
+            var floatY=Math.sin(t*Math.PI*4)*3; // tiny vertical bob
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
-            vctx.translate(VW/2,VH/2);
-            vctx.transform(1,skewV,skewH,1,0,0);
+            vctx.translate(VW/2+floatX,VH/2+floatY);
+            vctx.scale(scaleAmt,scaleAmt);
             vctx.translate(-cw/2,-ch/2);
 
             // Draw the HTML-captured card image (browser-quality)
