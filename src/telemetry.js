@@ -136,24 +136,29 @@ export function sendTelemetry(report) {
     ...gatherEnvironmentData(),
   };
 
-  // Fire and forget — never blocks the CLI
-  try {
-    const data = JSON.stringify(payload);
-    const url = new URL(TELEMETRY_URL);
-    const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': data.length },
-    });
-    req.on('error', () => {}); // silent fail
-    req.setTimeout(3000, () => req.destroy());
-    req.write(data);
-    req.end();
-    markTelemetrySent();
-  } catch {
-    // never crash on telemetry
-  }
+  // Returns a promise that resolves when the request completes (or times out)
+  // CLI must await this before exiting, otherwise the process kills the request
+  return new Promise((resolve) => {
+    try {
+      const data = JSON.stringify(payload);
+      const url = new URL(TELEMETRY_URL);
+      const req = https.request({
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      }, (res) => {
+        res.resume(); // drain response
+        res.on('end', () => { markTelemetrySent(); resolve(); });
+      });
+      req.on('error', () => resolve()); // silent fail, still resolve
+      req.setTimeout(4000, () => { req.destroy(); resolve(); });
+      req.write(data);
+      req.end();
+    } catch {
+      resolve(); // never block on telemetry failure
+    }
+  });
 }
 
 function costBucket(cost) {

@@ -164,8 +164,9 @@ async function main() {
 
   // Anonymous telemetry (opt out: --no-telemetry or CC_HUBBER_TELEMETRY=0)
   if (shouldSendTelemetry(flags)) {
-    sendTelemetry(report);
-    console.log('  ○ Anonymous stats shared (opt out: --no-telemetry)');
+    console.log('  ○ Sharing anonymous stats...');
+    await sendTelemetry(report);
+    console.log('  ✓ Stats shared (opt out: --no-telemetry)');
   }
 
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
