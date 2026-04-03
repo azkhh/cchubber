@@ -941,7 +941,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             vctx.drawImage(img,0,0,cw,ch);
 
             // Clip shimmer + noise to rounded card shape (prevents corner bleed)
-            var cr=22*scale;
+            var cr=22*3*scale; // 22px radius * 3 pixelRatio * video scale
             vctx.beginPath();
             vctx.moveTo(cr,0);vctx.lineTo(cw-cr,0);vctx.quadraticCurveTo(cw,0,cw,cr);
             vctx.lineTo(cw,ch-cr);vctx.quadraticCurveTo(cw,ch,cw-cr,ch);vctx.lineTo(cr,ch);
