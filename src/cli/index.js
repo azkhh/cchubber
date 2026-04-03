@@ -4,6 +4,13 @@ import { resolve, join } from 'path';
 import { existsSync, writeFileSync } from 'fs';
 import { homedir, platform } from 'os';
 import { exec } from 'child_process';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8'));
+const VERSION = PKG.version;
 
 import { readAllJSONL, aggregateDaily, aggregateByModel, aggregateByProject } from '../readers/jsonl-reader.js';
 import { readStatsCache } from '../readers/stats-cache.js';
@@ -41,7 +48,7 @@ const flags = {
 if (flags.help) {
   console.log(`
   ╔═══════════════════════════════════════════════╗
-  ║              CC Hubber v0.3.5                 ║
+  ║              CC Hubber v${VERSION}                 ║
   ║  What you spent. Why you spent it. Is that    ║
   ║  normal.                                      ║
   ╚═══════════════════════════════════════════════╝
@@ -78,7 +85,7 @@ async function main() {
 
   console.log(`
     /\\  _  /\\
-   /  \\(_)/  \\   CC Hubber v0.3.5
+   /  \\(_)/  \\   CC Hubber v${VERSION}
    \\  / ◉ \\  /   What you spent. Why. Is that normal.
     \\/  ~  \\/
   `);
