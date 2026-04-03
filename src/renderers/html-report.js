@@ -224,6 +224,7 @@ export function renderHTML(report) {
       background-size:128px 128px;
     }
     .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;min-height:280px;}
+    .cc-card.no-shimmer::before,.cc-card.no-shimmer::after{display:none!important;}
   </style>
   <div class="cc-card" id="share-card-html">
     <div class="cc-inner">
@@ -872,13 +873,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     var htmlCard=document.getElementById('share-card-html');
     if(!htmlCard||typeof htmlToImage==='undefined'){gb.textContent='Save Video';gb.disabled=false;showToast('Library not loaded');return}
 
-    // Pause CSS animation for clean capture
+    // Pause animation + hide CSS shimmer/noise for clean capture
     htmlCard.style.animation='none';htmlCard.style.transform='none';
+    htmlCard.classList.add('no-shimmer');
 
     document.fonts.ready.then(function(){
-      // Capture HTML card via SVG foreignObject (browser-quality rendering)
       return htmlToImage.toPng(htmlCard,{quality:1,pixelRatio:3}).then(function(dataUrl){
         htmlCard.style.animation='';htmlCard.style.transform='';
+        htmlCard.classList.remove('no-shimmer');
         gb.textContent='Recording...';
 
         var img=new Image();
@@ -922,9 +924,9 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             // Gentle breathe + float — matches the natural feel of the CSS animation
             // ease-in-out via cosine (same curve as CSS ease-in-out)
             var ease=0.5-0.5*Math.cos(t*Math.PI*2);
-            var scaleAmt=1+ease*0.012; // breathe: 1.0 to 1.012
-            var floatX=(ease-0.5)*8; // +-4px horizontal drift
-            var floatY=Math.sin(t*Math.PI*4)*3; // tiny vertical bob
+            var scaleAmt=1+ease*0.018; // breathe: 1.0 to 1.018
+            var floatX=(ease-0.5)*12; // +-6px horizontal drift
+            var floatY=Math.sin(t*Math.PI*4)*4; // subtle vertical bob
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
@@ -935,13 +937,16 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             // Draw the HTML-captured card image (browser-quality)
             vctx.drawImage(img,0,0,cw,ch);
 
-            // Shimmer overlay
-            var sx=-cw*0.4+(t%1)*cw*1.8;
-            var g=vctx.createLinearGradient(sx,0,sx+cw*0.25,ch);
+            // Shimmer — matches CSS ::before (angled sweep, same opacity)
+            var shimProgress=(t*2)%1; // 2 sweeps per 6 seconds
+            var sx=-cw*0.5+shimProgress*cw*2;
+            // Angled gradient (top-left to bottom-right like CSS 105deg)
+            var g=vctx.createLinearGradient(sx,0,sx+cw*0.4,ch);
             g.addColorStop(0,'rgba(255,255,255,0)');
-            g.addColorStop(0.45,'rgba(192,193,255,0.03)');
-            g.addColorStop(0.5,'rgba(255,255,255,0.06)');
-            g.addColorStop(0.55,'rgba(212,187,255,0.03)');
+            g.addColorStop(0.3,'rgba(192,193,255,0.04)');
+            g.addColorStop(0.45,'rgba(212,187,255,0.06)');
+            g.addColorStop(0.55,'rgba(192,193,255,0.06)');
+            g.addColorStop(0.7,'rgba(212,187,255,0.04)');
             g.addColorStop(1,'rgba(255,255,255,0)');
             vctx.fillStyle=g;vctx.fillRect(0,0,cw,ch);
 
@@ -954,7 +959,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         img.src=dataUrl;
       });
     }).catch(function(e){
-      htmlCard.style.animation='';htmlCard.style.transform='';
+      htmlCard.style.animation='';htmlCard.style.transform='';htmlCard.classList.remove('no-shimmer');
       gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
       gb.disabled=false;showToast('Failed: '+e.message);
     });
