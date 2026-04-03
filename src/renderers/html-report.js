@@ -197,14 +197,71 @@ export function renderHTML(report) {
 
 <main class="pb-20 px-6 max-w-[1200px] mx-auto space-y-12">
 
-<!-- 2. SHARE CARD — Pure Canvas (same renderer for display + export) -->
+<!-- 2. SHARE CARD — HTML for display, Canvas for video export -->
 <section class="flex flex-col items-center">
   <style>
     @keyframes cardFloat{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
-    #share-card{animation:cardFloat 6s ease-in-out infinite;box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    .cc-card{
+      position:relative;width:100%;max-width:740px;
+      border-radius:22px;overflow:hidden;
+      background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
+      box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);
+      animation:cardFloat 6s ease-in-out infinite;
+    }
+    .cc-card::before{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(105deg,transparent 30%,rgba(192,193,255,0.04) 45%,rgba(212,187,255,0.06) 50%,rgba(192,193,255,0.04) 55%,transparent 70%);
+      background-size:200% 100%;animation:shimmer 4s ease-in-out infinite;
+      pointer-events:none;z-index:2;
+    }
+    .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:36px;padding:40px 44px;}
   </style>
-  <canvas id="share-card" style="width:100%;max-width:740px;border-radius:22px;cursor:default;"></canvas>
-  <div class="flex justify-center mt-5 gap-3">
+  <div class="cc-card" id="share-card-html">
+    <div class="cc-inner">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 flex items-center justify-center rounded-[12px]" style="background:${gradeColor}">
+            <span class="font-black text-[28px]" style="color:#0f1018">${grade.letter}</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-[0.08em] font-bold block" style="color:${gradeColor}">${grade.label}</span>
+            <span class="text-xl font-bold text-[#e3e2e3]">${gradeLabel}</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[11px] font-mono uppercase tracking-[0.1em] text-[#908fa0] font-bold block">Claude Code</span>
+          <span class="text-[11px] font-mono uppercase tracking-[0.06em] text-[#596678] block" id="card-range">All time</span>
+        </div>
+      </div>
+      <div class="flex justify-between items-end">
+        <div>
+          <p class="text-[10px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Total Spend</p>
+          <p class="font-mono text-[40px] font-bold text-[#e3e2e3] leading-none" id="h-cost">${fmtCost(totalCost)}</p>
+        </div>
+        <div class="text-center">
+          <p class="text-[10px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Active Days</p>
+          <p class="font-mono text-[40px] font-bold text-[#e3e2e3] leading-none" id="h-days">${activeDays}</p>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Cache Ratio</p>
+          <p class="font-mono text-[40px] font-bold text-[#e3e2e3] leading-none">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}</p>
+        </div>
+      </div>
+      <div class="flex justify-between items-end">
+        <p class="text-[12px] text-[#908fa0]">${diagnosisLine}</p>
+        <div class="flex items-center gap-2 text-[12px] font-mono tracking-[0.03em] shrink-0">
+          <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff]" style="text-decoration:none;font-weight:600;">CC Hubber</a>
+          <span class="text-[#464554]">&middot;</span>
+          <span class="text-[#908fa0]">shipped fast with</span>
+          <a href="https://moveros.dev" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff]" style="text-decoration:none;font-weight:600;">Mover OS</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Hidden canvas for video recording -->
+  <canvas id="share-card" style="display:none;"></canvas>
+  <div class="flex justify-center mt-5">
     <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
       <span class="material-symbols-outlined text-sm">videocam</span>
       Save Video
@@ -662,11 +719,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     if(ci&&f.length){var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;ci.textContent=a+' days \u00b7 '+fc(t)}
     var rl=document.getElementById('range-lbl');if(rl)rl.textContent=RL[r]||'All time';
     CARD.range=RL[r]||'All time';
+    var cr=document.getElementById('card-range');if(cr)cr.textContent=CARD.range;
     if(f.length){
       var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;
-      // Update canvas card data
       CARD.cost=fc(t);CARD.days=a.toString();
-      // Update overview section
+      // Update HTML card
+      var hc=document.getElementById('h-cost');if(hc)hc.textContent=fc(t);
+      var hd=document.getElementById('h-days');if(hd)hd.textContent=a;
+      // Update overview
       var ot=document.getElementById('ov-total'),oa=document.getElementById('ov-avg');
       if(ot)ot.textContent=fc(t);if(oa&&a>0)oa.textContent=fc(t/a)+' avg/day';
     }
