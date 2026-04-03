@@ -137,7 +137,7 @@ export function renderHTML(report) {
   /* Info tooltips */
   .has-tip{position:relative;cursor:help;}
   .has-tip .tip{
-    position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+    position:absolute;top:calc(100% + 8px);left:0;transform:none;
     background:#292a2b;border:1px solid rgba(70,69,84,0.3);border-radius:8px;
     padding:10px 14px;font-size:11px;line-height:1.5;color:#c7c4d7;
     width:280px;pointer-events:none;opacity:0;transition:opacity 0.15s;
@@ -285,8 +285,8 @@ export function renderHTML(report) {
   <canvas id="share-card" style="display:none;"></canvas>
   <div class="flex justify-center mt-5">
     <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
-      <span class="material-symbols-outlined text-sm">videocam</span>
-      Save Video
+      <span class="material-symbols-outlined text-sm">share</span>
+      Share
     </button>
   </div>
 </section>
@@ -307,7 +307,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
 ` : ''}
 
 <!-- 3. METRIC GRID -->
-<section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 rounded-xl overflow-hidden border border-[rgba(70,69,84,0.15)]" style="gap:1px; background:rgba(70,69,84,0.15);">
+<section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 rounded-xl border border-[rgba(70,69,84,0.15)]" style="gap:1px; background:rgba(70,69,84,0.15);">
   <div class="p-6 bg-[#0d0e0f]">
     <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3">Total Cost</span>
     <span class="font-mono text-2xl font-bold block text-[#e3e2e3]" id="ov-total">${fmtCost(totalCost)}</span>
@@ -898,7 +898,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   if(gb)gb.addEventListener('click',function(){
     gb.textContent='Capturing...';gb.disabled=true;
     var htmlCard=document.getElementById('share-card-html');
-    if(!htmlCard||typeof htmlToImage==='undefined'){gb.textContent='Save Video';gb.disabled=false;showToast('Library not loaded');return}
+    if(!htmlCard||typeof htmlToImage==='undefined'){gb.textContent='Share';gb.disabled=false;showToast('Library not loaded');return}
 
     // Pause animation + hide CSS shimmer/noise for clean capture
     htmlCard.style.animation='none';htmlCard.style.transform='none';
@@ -935,7 +935,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             var blob=new Blob(chunks,{type:mime.split(';')[0]});
             var a=document.createElement('a');a.download='cchubber-card.'+ext;
             a.href=URL.createObjectURL(blob);a.click();
-            gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
+            gb.innerHTML='<span class="material-symbols-outlined text-sm">share</span> Share';
             gb.disabled=false;showToast('Video saved ('+ext.toUpperCase()+')');
           };
 
@@ -1001,7 +1001,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       });
     }).catch(function(e){
       htmlCard.style.animation='';htmlCard.style.transform='';htmlCard.classList.remove('no-shimmer');
-      gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
+      gb.innerHTML='<span class="material-symbols-outlined text-sm">share</span> Share';
       gb.disabled=false;showToast('Failed: '+e.message);
     });
   });
