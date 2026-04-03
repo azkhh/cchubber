@@ -1,0 +1,10 @@
+name = "cchubber-telemetry"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "TELEMETRY"
+id = "" # Will be filled after creating KV namespace
+
+[vars]
+STATS_KEY = "cchubber_stats_2026"
