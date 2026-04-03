@@ -312,7 +312,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <span class="text-[10px] text-[#908fa0] mt-1 block font-mono">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : ''}</span>
   </div>
   <div class="p-6 bg-[#0d0e0f]">
-    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3">Cache Breaks</span>
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3 cursor-help" title="Cache breaks happen when your prompt cache is invalidated — forcing Claude Code to re-read your entire context at 12.5x the cached price. Causes: editing CLAUDE.md, changing MCP tools, model switches, TTL expiry. ${cacheHealth.totalCacheBreaks > 0 ? 'Counted from cache-break diff files.' : 'Estimated from cache write tokens (~300K per break) since no diff files were found on your CC version.'}">Cache Breaks <span class="text-[8px] text-[#464554]">&#9432;</span></span>
     <span class="font-mono text-2xl font-bold block text-[#e3e2e3]">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.totalCacheBreaks : '~' + (cacheHealth.estimatedBreaks || 0)}</span>
     <span class="text-[10px] text-[#908fa0] mt-1 block">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.reasonsRanked?.[0]?.reason : 'estimated from writes'}</span>
   </div>
@@ -558,7 +558,7 @@ ${anomalies.hasAnomalies ? `
         </tr>
       </thead>
       <tbody class="divide-y divide-[rgba(70,69,84,0.15)]">
-        ${claudeMdStack.globalSections.slice(0, 12).map(s => `<tr class="tbl-row">
+        ${claudeMdStack.globalSections.map(s => `<tr class="tbl-row">
           <td class="px-8 py-3 text-sm text-[#e3e2e3]">${s.name}</td>
           <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.lines}</td>
           <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.tokens.toLocaleString()}</td>

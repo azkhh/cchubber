@@ -28,10 +28,9 @@ export function readClaudeMdStack(claudeDir) {
     }
     if (currentSection.lines > 0) sections.push(currentSection);
 
-    // Add token estimates and sort by size
+    // Add token estimates, keep original file order (don't sort)
     globalSections = sections
-      .map(s => ({ ...s, tokens: Math.round(s.bytes / 4) }))
-      .sort((a, b) => b.bytes - a.bytes);
+      .map((s, idx) => ({ ...s, tokens: Math.round(s.bytes / 4), order: idx }));
 
     stack.push({
       level: 'global',
