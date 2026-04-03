@@ -886,8 +886,8 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
           var vctx=vidCanvas.getContext('2d');
           vctx.imageSmoothingEnabled=true;vctx.imageSmoothingQuality='high';
 
-          // Scale card to ~78% of frame width
-          var scale=Math.min((VW*0.78)/img.width,(VH*0.78)/img.height);
+          // Scale card to fill ~90% of frame width for maximum impact
+          var scale=Math.min((VW*0.88)/img.width,(VH*0.82)/img.height);
           var cw=Math.round(img.width*scale),ch=Math.round(img.height*scale);
           var r=22*3*scale; // border radius
 
@@ -916,14 +916,17 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
 
             var t=elapsed/duration;
-            var phase=Math.sin(t*Math.PI*2);
-            var dx=phase*18;
-            var squeeze=1-Math.abs(phase)*0.005;
+            // Simulate CSS perspective(800px) rotateY/rotateX
+            var rotY=Math.sin(t*Math.PI*2)*2; // +-2 degrees, matches CSS
+            var rotX=Math.cos(t*Math.PI*2)*1; // +-1 degree
+            var skewH=Math.tan(rotY*Math.PI/180)*0.4; // horizontal perspective shear
+            var skewV=Math.tan(rotX*Math.PI/180)*0.2; // vertical tilt
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
-            vctx.translate(VW/2+dx,VH/2);
-            vctx.scale(squeeze,1);
+            vctx.translate(VW/2,VH/2);
+            // Apply perspective-like transform: skew simulates 3D rotation
+            vctx.transform(1,skewV,skewH,1,0,0);
             vctx.translate(-cw/2,-ch/2);
 
             // Draw the HTML-captured card image (browser-quality)
