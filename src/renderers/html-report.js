@@ -134,6 +134,18 @@ export function renderHTML(report) {
   }
   .font-mono { font-family: 'JetBrains Mono', monospace !important; }
 
+  /* Info tooltips */
+  .has-tip{position:relative;cursor:help;}
+  .has-tip .tip{
+    position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+    background:#292a2b;border:1px solid rgba(70,69,84,0.3);border-radius:8px;
+    padding:10px 14px;font-size:11px;line-height:1.5;color:#c7c4d7;
+    width:280px;pointer-events:none;opacity:0;transition:opacity 0.15s;
+    z-index:50;text-transform:none;letter-spacing:0;font-weight:400;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+  .has-tip:hover .tip{opacity:1;pointer-events:auto;}
+
   /* Tooltip */
   .tt {
     position: fixed;
@@ -190,8 +202,8 @@ export function renderHTML(report) {
 <!-- 1. HEADER -->
 <header class="w-full px-6 py-5 max-w-[1200px] mx-auto flex justify-between items-baseline">
   <div class="flex items-baseline gap-4">
-    <span class="text-lg font-bold tracking-tight text-[#e3e2e3]">CC Hubber</span>
-    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0]">shipped fast with Mover OS</span>
+    <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-lg font-bold tracking-tight text-[#e3e2e3]" style="text-decoration:none;">CC Hubber</a>
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0]">shipped fast with <a href="https://moveros.dev" target="_blank" style="text-decoration:none;color:inherit;">Mover OS</a></span>
   </div>
   <span class="font-mono text-[11px] text-[#908fa0]" id="range-lbl">All time</span>
 </header>
@@ -307,12 +319,16 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <span class="text-[10px] text-[#908fa0] mt-1 block font-mono">${peakDay ? peakDay.date : ''}</span>
   </div>
   <div class="p-6 bg-[#0d0e0f]">
-    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3">Cache Health</span>
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3 has-tip">Cache Health <span class="text-[8px] text-[#464554]">&#9432;</span>
+      <span class="tip">Overall grade based on your cache efficiency ratio, weighted towards recent 7 days. A-B = healthy (300-800:1 ratio). C = elevated, investigate. D-F = critical, likely affected by cache bugs. The grade drops when recent efficiency is worse than historical.</span>
+    </span>
     <span class="font-mono text-2xl font-bold block" style="color:${gradeColor}">${grade.letter}</span>
     <span class="text-[10px] text-[#908fa0] mt-1 block font-mono">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : ''}</span>
   </div>
   <div class="p-6 bg-[#0d0e0f]">
-    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3 cursor-help" title="Cache breaks happen when your prompt cache is invalidated — forcing Claude Code to re-read your entire context at 12.5x the cached price. Causes: editing CLAUDE.md, changing MCP tools, model switches, TTL expiry. ${cacheHealth.totalCacheBreaks > 0 ? 'Counted from cache-break diff files.' : 'Estimated from cache write tokens (~300K per break) since no diff files were found on your CC version.'}">Cache Breaks <span class="text-[8px] text-[#464554]">&#9432;</span></span>
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-3 has-tip">Cache Breaks <span class="text-[8px] text-[#464554]">&#9432;</span>
+      <span class="tip">When your prompt cache is invalidated, Claude Code re-reads your entire context at 12.5x the cached price. Causes: editing CLAUDE.md mid-session, connecting/disconnecting MCP tools, model switches, 5-min inactivity timeout. ${cacheHealth.totalCacheBreaks > 0 ? 'Counted from cache-break diff files.' : 'Estimated from cache write tokens since no diff files exist on your CC version.'}</span>
+    </span>
     <span class="font-mono text-2xl font-bold block text-[#e3e2e3]">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.totalCacheBreaks : '~' + (cacheHealth.estimatedBreaks || 0)}</span>
     <span class="text-[10px] text-[#908fa0] mt-1 block">${cacheHealth.totalCacheBreaks > 0 ? cacheHealth.reasonsRanked?.[0]?.reason : 'estimated from writes'}</span>
   </div>
@@ -609,7 +625,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 <!-- 12. FOOTER -->
 <footer class="w-full py-12 border-t border-[rgba(70,69,84,0.05)]">
   <div class="max-w-[1200px] mx-auto px-6 text-center">
-    <span class="text-[10px] tracking-widest uppercase text-[#908fa0]">CC Hubber &middot; shipped fast with Mover OS</span>
+    <span class="text-[10px] tracking-widest uppercase text-[#908fa0]"><a href="https://github.com/azkhh/cchubber" target="_blank" style="text-decoration:none;color:inherit;">CC Hubber</a> &middot; shipped fast with <a href="https://moveros.dev" target="_blank" style="text-decoration:none;color:inherit;">Mover OS</a></span>
   </div>
 </footer>
 
