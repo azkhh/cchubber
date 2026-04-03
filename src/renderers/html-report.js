@@ -197,85 +197,12 @@ export function renderHTML(report) {
 
 <main class="pb-20 px-6 max-w-[1200px] mx-auto space-y-12">
 
-<!-- 2. SHARE CARD — Credit Card Style -->
+<!-- 2. SHARE CARD — Pure Canvas (same renderer for display + export) -->
 <section class="flex flex-col items-center">
-  <style>
-    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-    @keyframes float{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
-    .cc-card{
-      position:relative;width:100%;max-width:740px;
-      border-radius:22px;overflow:hidden;
-      background:linear-gradient(145deg,#1a1b2e 0%,#0f1018 40%,#191a2d 70%,#12131f 100%);
-      box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);
-      animation:float 6s ease-in-out infinite;
-      cursor:default;
-    }
-    .cc-card::before{
-      content:'';position:absolute;inset:0;
-      background:linear-gradient(105deg,transparent 30%,rgba(192,193,255,0.04) 45%,rgba(212,187,255,0.06) 50%,rgba(192,193,255,0.04) 55%,transparent 70%);
-      background-size:200% 100%;
-      animation:shimmer 4s ease-in-out infinite;
-      pointer-events:none;z-index:2;
-    }
-    .cc-card::after{display:none;}
-    .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;gap:36px;padding:40px 44px;}
-  </style>
-  <div class="cc-card" id="share-card">
-    <div class="cc-inner">
-      <!-- Top: Grade badge + label -->
-      <div class="flex items-start justify-between">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 flex items-center justify-center rounded-[12px]" style="background:${gradeColor};box-shadow:0 0 20px ${gradeColor}30;">
-            <span class="font-black text-[28px]" style="color:#0f1018">${grade.letter}</span>
-          </div>
-          <div>
-            <span class="text-[9px] font-mono uppercase tracking-[0.08em] block" style="color:${gradeColor}">${grade.label}</span>
-            <span class="text-lg font-bold text-[#e3e2e3]">${gradeLabel}</span>
-          </div>
-        </div>
-        <div class="text-right">
-          <span class="text-[10px] font-mono uppercase tracking-[0.1em] text-[#908fa0] font-bold block">Claude Code</span>
-          <span class="text-[9px] font-mono uppercase tracking-[0.08em] text-[#343536] block" id="card-range">All time</span>
-        </div>
-      </div>
-
-      <!-- Middle: Three big stats -->
-      <div class="flex justify-between items-end">
-        <div>
-          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Total Spend</p>
-          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none" id="h-cost">${fmtCost(totalCost)}</p>
-        </div>
-        <div class="text-center">
-          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Active Days</p>
-          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none" id="h-days">${activeDays}</p>
-        </div>
-        <div class="text-right">
-          <p class="text-[9px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Cache Ratio</p>
-          <p class="font-mono text-[36px] font-bold text-[#e3e2e3] leading-none">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}</p>
-        </div>
-      </div>
-
-      <!-- Bottom: Diagnosis left, branding right -->
-      <div class="flex justify-between items-end">
-        <p class="text-[11px] text-[#908fa0]">${diagnosisLine}</p>
-        <div class="flex items-center gap-2 text-[10px] font-mono tracking-[0.04em] shrink-0">
-          <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff] transition-colors" style="text-decoration:none;">CC Hubber</a>
-          <span class="text-[#464554]">&middot;</span>
-          <span class="text-[#908fa0]">shipped fast with</span>
-          <a href="https://moveros.dev" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff] transition-colors" style="text-decoration:none;">Mover OS</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Export buttons -->
+  <canvas id="share-card" style="width:100%;max-width:740px;border-radius:22px;cursor:default;"></canvas>
   <div class="flex justify-center mt-5 gap-3">
-    <button id="btn-png" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
-      <span class="material-symbols-outlined text-sm">image</span>
-      Save PNG
-    </button>
     <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
-      <span class="material-symbols-outlined text-sm">gif_box</span>
+      <span class="material-symbols-outlined text-sm">videocam</span>
       Save Video
     </button>
   </div>
@@ -605,11 +532,18 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   </div>
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+<!-- No capture libraries needed — card renders on canvas directly -->
 <script>
 (function(){
   var D=${dailyCostsJSON}, P=${projectsJSON};
+  var CARD={
+    grade:'${grade.letter}',gradeLabel:'${grade.label}',gradePerf:'${gradeLabel}',
+    gradeColor:'${gradeColor}',
+    cost:'${fmtCost(totalCost)}',days:'${activeDays}',
+    ratio:'${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}',
+    diagnosis:'${diagnosisLine.replace(/'/g, "\\'")}',
+    range:'All time'
+  };
   var HR=${sessionIntel?.hourDistribution ? JSON.stringify(sessionIntel.hourDistribution) : 'null'};
   var CACHE_R=0.50,OUT=25,INP=5,CW=6.25;
 
@@ -723,12 +657,13 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     var ci=document.getElementById('chart-info');
     if(ci&&f.length){var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;ci.textContent=a+' days \u00b7 '+fc(t)}
     var rl=document.getElementById('range-lbl');if(rl)rl.textContent=RL[r]||'All time';
-    var cr=document.getElementById('card-range');if(cr)cr.textContent=RL[r]||'All time';
+    CARD.range=RL[r]||'All time';
     if(f.length){
       var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;
-      var hc=document.getElementById('h-cost'),hd=document.getElementById('h-days');
+      // Update canvas card data
+      CARD.cost=fc(t);CARD.days=a.toString();
+      // Update overview section
       var ot=document.getElementById('ov-total'),oa=document.getElementById('ov-avg');
-      if(hc)hc.textContent=fc(t);if(hd)hd.textContent=a;
       if(ot)ot.textContent=fc(t);if(oa&&a>0)oa.textContent=fc(t/a)+' avg/day';
     }
     // Update filter button states - Stitch style
@@ -747,163 +682,165 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   var toast=document.getElementById('toast');
   function showToast(m){if(!toast)return;toast.textContent=m;toast.classList.add('on');setTimeout(function(){toast.classList.remove('on')},2000)}
 
-  function captureCard(targetScale){
-    var card=document.getElementById('share-card');
-    if(!card)return Promise.reject();
-    card.style.animation='none';
-    card.style.transform='none';
-    var w=card.offsetWidth,h=card.offsetHeight;
-    var s=targetScale||3;
+  // ─── CANVAS SHARE CARD ─────────────────────────────
+  // Renders entirely on canvas — same output for display AND video export
+  var cardCanvas=document.getElementById('share-card');
+  var cardW=1480,cardH=580,cardR=44; // 2x resolution for retina
+  cardCanvas.width=cardW;cardCanvas.height=cardH;
+  var cardCtx=cardCanvas.getContext('2d');
 
-    // Try dom-to-image first (uses SVG foreignObject — much sharper)
-    var useDomToImage=typeof domtoimage!=='undefined';
-    var capturePromise;
-
-    if(useDomToImage){
-      capturePromise=domtoimage.toPng(card,{
-        width:w,height:h,
-        style:{animation:'none',transform:'none'},
-        quality:1,
-      }).then(function(dataUrl){
-        return new Promise(function(resolve){
-          var img=new Image();
-          img.onload=function(){
-            var out=document.createElement('canvas');out.width=w*s;out.height=h*s;
-            var ctx=out.getContext('2d');
-            ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-            // Rounded clip
-            var r=22*s;
-            ctx.beginPath();
-            ctx.moveTo(r,0);ctx.lineTo(w*s-r,0);ctx.quadraticCurveTo(w*s,0,w*s,r);
-            ctx.lineTo(w*s,h*s-r);ctx.quadraticCurveTo(w*s,h*s,w*s-r,h*s);
-            ctx.lineTo(r,h*s);ctx.quadraticCurveTo(0,h*s,0,h*s-r);
-            ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-            ctx.closePath();ctx.clip();
-            ctx.fillStyle='#0f1018';ctx.fillRect(0,0,w*s,h*s);
-            ctx.drawImage(img,0,0,w*s,h*s);
-            resolve(out);
-          };
-          img.src=dataUrl;
-        });
-      });
-    } else {
-      capturePromise=html2canvas(card,{
-        backgroundColor:null,scale:s,useCORS:true,logging:false,width:w,height:h,windowWidth:w+100,
-      }).then(function(raw){
-        var out=document.createElement('canvas');out.width=w*s;out.height=h*s;
-        var ctx=out.getContext('2d');
-        var r=22*s;
-        ctx.beginPath();
-        ctx.moveTo(r,0);ctx.lineTo(w*s-r,0);ctx.quadraticCurveTo(w*s,0,w*s,r);
-        ctx.lineTo(w*s,h*s-r);ctx.quadraticCurveTo(w*s,h*s,w*s-r,h*s);
-        ctx.lineTo(r,h*s);ctx.quadraticCurveTo(0,h*s,0,h*s-r);
-        ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
-        ctx.closePath();ctx.clip();
-        ctx.fillStyle='#0f1018';ctx.fillRect(0,0,w*s,h*s);
-        ctx.drawImage(raw,0,0,w*s,h*s);
-        return out;
-      });
-    }
-
-    return capturePromise.then(function(out){
-      card.style.animation='';card.style.transform='';
-      return out;
-    });
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
   }
 
-  // PNG export
-  var pb=document.getElementById('btn-png');
-  if(pb)pb.addEventListener('click',function(){
-    pb.textContent='Exporting...';pb.disabled=true;
-    captureCard().then(function(c){
-      var a=document.createElement('a');a.download='cchubber-card.png';a.href=c.toDataURL('image/png');a.click();
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">image</span> Save PNG';
-      pb.disabled=false;showToast('PNG saved');
-    }).catch(function(){
-      pb.innerHTML='<span class="material-symbols-outlined text-sm">image</span> Save PNG';
-      pb.disabled=false;showToast('Failed');
-    });
-  });
+  function drawCard(ctx,w,h,shimmerT){
+    // Background gradient
+    var bg=ctx.createLinearGradient(0,0,w,h);
+    bg.addColorStop(0,'#1a1b2e');bg.addColorStop(0.4,'#0f1018');bg.addColorStop(0.7,'#191a2d');bg.addColorStop(1,'#12131f');
+    roundRect(ctx,0,0,w,h,cardR);ctx.save();ctx.clip();
+    ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
 
-  // Video export — 1080p, high quality, smooth animation
+    var pad=80,padT=72;
+
+    // Grade badge
+    var bx=pad,by=padT,bs=112;
+    roundRect(ctx,bx,by,bs,bs,24);
+    ctx.fillStyle=CARD.gradeColor;ctx.fill();
+    ctx.font='800 56px "JetBrains Mono",monospace';ctx.fillStyle='#0f1018';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(CARD.grade,bx+bs/2,by+bs/2);
+
+    // Grade label + performance text
+    ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.font='700 18px "JetBrains Mono",monospace';ctx.fillStyle=CARD.gradeColor;
+    ctx.fillText(CARD.gradeLabel.toUpperCase(),bx+bs+32,by+12);
+    ctx.font='700 36px "Inter",sans-serif';ctx.fillStyle='#e3e2e3';
+    ctx.fillText(CARD.gradePerf,bx+bs+32,by+40);
+
+    // Top right: Claude Code + range
+    ctx.textAlign='right';
+    ctx.font='700 20px "JetBrains Mono",monospace';ctx.fillStyle='#908fa0';
+    ctx.fillText('CLAUDE CODE',w-pad,padT+16);
+    ctx.font='400 16px "JetBrains Mono",monospace';ctx.fillStyle='#464554';
+    ctx.fillText(CARD.range,w-pad,padT+44);
+
+    // Stats row
+    var statsY=h*0.45;
+    var labels=['TOTAL SPEND','ACTIVE DAYS','CACHE RATIO'];
+    var values=[CARD.cost,CARD.days,CARD.ratio];
+    var positions=[pad,w*0.38,w*0.7];
+    var aligns=['left','center','right'];
+    var xEnds=[null,null,w-pad];
+
+    for(var i=0;i<3;i++){
+      ctx.textAlign=i===2?'right':i===1?'center':'left';
+      var sx=i===2?w-pad:i===1?w/2:pad;
+      ctx.font='400 16px "Inter",sans-serif';ctx.fillStyle='#908fa0';
+      ctx.fillText(labels[i],sx,statsY);
+      ctx.font='700 64px "JetBrains Mono",monospace';ctx.fillStyle='#e3e2e3';
+      ctx.fillText(values[i],sx,statsY+28);
+    }
+
+    // Bottom: diagnosis + branding
+    var botY=h-padT;
+    ctx.textAlign='left';
+    ctx.font='400 20px "Inter",sans-serif';ctx.fillStyle='#908fa0';
+    ctx.fillText(CARD.diagnosis,pad,botY);
+
+    ctx.textAlign='right';
+    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
+    ctx.fillText('CC Hubber',w-pad-260,botY);
+    ctx.font='400 18px "Inter",sans-serif';ctx.fillStyle='#908fa0';
+    ctx.fillText('shipped fast with',w-pad-120,botY);
+    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
+    ctx.fillText('Mover OS',w-pad,botY);
+
+    // Shimmer overlay
+    if(shimmerT!==undefined){
+      var sx=-w*0.3+(shimmerT%1)*w*1.6;
+      var sg=ctx.createLinearGradient(sx,0,sx+w*0.2,h);
+      sg.addColorStop(0,'rgba(255,255,255,0)');
+      sg.addColorStop(0.45,'rgba(192,193,255,0.03)');
+      sg.addColorStop(0.5,'rgba(255,255,255,0.08)');
+      sg.addColorStop(0.55,'rgba(212,187,255,0.03)');
+      sg.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=sg;ctx.fillRect(0,0,w,h);
+    }
+
+    ctx.restore();
+  }
+
+  // Animate the card on the page
+  var cardAnimStart=null;
+  function animateCard(ts){
+    if(!cardAnimStart)cardAnimStart=ts;
+    var t=((ts-cardAnimStart)%6000)/6000;
+    drawCard(cardCtx,cardW,cardH,t);
+    requestAnimationFrame(animateCard);
+  }
+  document.fonts.ready.then(function(){requestAnimationFrame(animateCard)});
+
+  // ─── VIDEO EXPORT (records the same canvas) ──────
+  // Video export — records the share-card canvas directly at 1080p
+  // Same canvas, same renderer, perfect 1:1 match
   var gb=document.getElementById('btn-gif');
   if(gb)gb.addEventListener('click',function(){
     gb.textContent='Recording...';gb.disabled=true;
-    var card=document.getElementById('share-card');
-    if(!card){gb.textContent='Save Video';gb.disabled=false;return}
 
-    // Capture card using dom-to-image at 2x for sharp 1080p video
-    document.fonts.ready.then(function(){
-      // Use captureCard with scale that fits 1080p
-      var VW=1920,VH=1080;
-      var ew=card.offsetWidth;
-      var targetW=VW*0.76;
-      var vidScale=targetW/ew;
+    // Create 1080p canvas, draw the card centered on black with animation
+    var VW=1920,VH=1080;
+    var vidCanvas=document.createElement('canvas');vidCanvas.width=VW;vidCanvas.height=VH;
+    var vctx=vidCanvas.getContext('2d');
 
-      return captureCard(vidScale).then(function(cardCanvas){
-        var cw=cardCanvas.width,ch=cardCanvas.height;
-        var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
+    // Scale card to fit 80% of 1080p width
+    var scale=Math.min((VW*0.78)/cardW,(VH*0.78)/cardH);
+    var cw=Math.round(cardW*scale),ch=Math.round(cardH*scale);
+    var cx=Math.round((VW-cw)/2),cy=Math.round((VH-ch)/2);
 
-        var canvas=document.createElement('canvas');canvas.width=VW;canvas.height=VH;
-        var ctx=canvas.getContext('2d');
+    var stream=vidCanvas.captureStream(30);
+    var chunks=[];
+    var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:25000000});
+    recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
+    recorder.onstop=function(){
+      var blob=new Blob(chunks,{type:'video/mp4'});
+      var a=document.createElement('a');a.download='cchubber-card.mp4';
+      a.href=URL.createObjectURL(blob);a.click();
+      gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
+      gb.disabled=false;showToast('Video saved');
+    };
 
-        var stream=canvas.captureStream(0);
-        var chunks=[];
-        var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:25000000});
-        recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
-        recorder.onstop=function(){
-          var blob=new Blob(chunks,{type:'video/mp4'});
-          var a=document.createElement('a');a.download='cchubber-card.mp4';
-          a.href=URL.createObjectURL(blob);a.click();
-          gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-          gb.disabled=false;showToast('Video saved');
-        };
+    var duration=6000,startTime=null;
+    recorder.start(50);
 
-        var duration=5000,startTime=null;
-        recorder.start(50);
+    function vidFrame(ts){
+      if(!startTime)startTime=ts;
+      var elapsed=ts-startTime;
+      if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
 
-        function animate(ts){
-          if(!startTime)startTime=ts;
-          var elapsed=ts-startTime;
-          if(elapsed>=duration){
-            try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
-            setTimeout(function(){recorder.stop()},300);
-            return;
-          }
+      var t=elapsed/duration;
 
-          var t=elapsed/duration;
-          // Match CSS: perspective rotateY oscillation — approximate as horizontal shift + subtle scale
-          var phase=Math.sin(t*Math.PI*2);
-          var dx=phase*16;
-          var scaleX=1-Math.abs(phase)*0.008; // subtle width squeeze simulates perspective
+      // Draw card at video resolution using the same drawCard function
+      // Create a temp canvas at video card size, draw card onto it, then composite
+      var tmpC=document.createElement('canvas');tmpC.width=cw;tmpC.height=ch;
+      var tmpCtx=tmpC.getContext('2d');
+      tmpCtx.scale(scale,scale);
+      drawCard(tmpCtx,cardW,cardH,t);
 
-          ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
-          ctx.save();
-          ctx.translate(VW/2+dx,cy);
-          ctx.scale(scaleX,1);
-          ctx.translate(-cw/2,0);
-          ctx.drawImage(cardCanvas,0,0);
+      // 1080p frame: black bg + card with gentle perspective float
+      var phase=Math.sin(t*Math.PI*2);
+      vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
+      vctx.save();
+      vctx.translate(VW/2+phase*14,VH/2);
+      vctx.scale(1-Math.abs(phase)*0.006,1);
+      vctx.translate(-cw/2,-ch/2);
+      vctx.drawImage(tmpC,0,0);
+      vctx.restore();
 
-          // Shimmer
-          var sx=-cw*0.3+(t%1)*cw*1.6;
-          var g=ctx.createLinearGradient(sx,0,sx+cw*0.2,ch);
-          g.addColorStop(0,'rgba(255,255,255,0)');
-          g.addColorStop(0.45,'rgba(192,193,255,0.03)');
-          g.addColorStop(0.5,'rgba(255,255,255,0.07)');
-          g.addColorStop(0.55,'rgba(212,187,255,0.03)');
-          g.addColorStop(1,'rgba(255,255,255,0)');
-          ctx.fillStyle=g;ctx.fillRect(0,0,cw,ch);
-          ctx.restore();
+      requestAnimationFrame(vidFrame);
+    }
 
-          try{stream.getVideoTracks()[0].requestFrame()}catch(e){}
-          requestAnimationFrame(animate);
-        }
-        requestAnimationFrame(animate);
-      });
-    }).catch(function(){
-      gb.innerHTML='<span class="material-symbols-outlined text-sm">gif_box</span> Save Video';
-      gb.disabled=false;showToast('Failed');
-    });
+    requestAnimationFrame(vidFrame);
   });
 
   setR('all');
