@@ -199,6 +199,10 @@ export function renderHTML(report) {
 
 <!-- 2. SHARE CARD — Pure Canvas (same renderer for display + export) -->
 <section class="flex flex-col items-center">
+  <style>
+    @keyframes cardFloat{0%,100%{transform:perspective(800px) rotateY(-2deg) rotateX(1deg)}50%{transform:perspective(800px) rotateY(2deg) rotateX(-1deg)}}
+    #share-card{animation:cardFloat 6s ease-in-out infinite;box-shadow:0 2px 4px rgba(0,0,0,0.1),0 8px 16px rgba(0,0,0,0.1),0 16px 32px rgba(0,0,0,0.15);}
+  </style>
   <canvas id="share-card" style="width:100%;max-width:740px;border-radius:22px;cursor:default;"></canvas>
   <div class="flex justify-center mt-5 gap-3">
     <button id="btn-gif" class="px-5 py-2 border border-[rgba(70,69,84,0.3)] rounded-lg text-xs font-semibold text-[#908fa0] hover:bg-[#292a2b] hover:text-[#e3e2e3] transition-colors flex items-center gap-2 cursor-pointer">
@@ -748,22 +752,33 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     ctx.font='400 20px "Inter",sans-serif';ctx.fillStyle='#908fa0';
     ctx.fillText(CARD.diagnosis,pad,botY);
 
+    // Branding — measure text to space properly
     ctx.textAlign='right';
-    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
-    ctx.fillText('CC Hubber',w-pad-260,botY);
-    ctx.font='400 18px "Inter",sans-serif';ctx.fillStyle='#908fa0';
-    ctx.fillText('shipped fast with',w-pad-120,botY);
-    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
-    ctx.fillText('Mover OS',w-pad,botY);
+    ctx.font='500 18px "JetBrains Mono",monospace';
+    var moverW=ctx.measureText('Mover OS').width;
+    ctx.font='400 18px "Inter",sans-serif';
+    var shippedW=ctx.measureText(' shipped fast with ').width;
+    ctx.font='500 18px "JetBrains Mono",monospace';
+    var hubberW=ctx.measureText('CC Hubber').width;
 
-    // Shimmer overlay
+    var bx=w-pad;
+    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
+    ctx.fillText('Mover OS',bx,botY);
+    bx-=moverW;
+    ctx.font='400 18px "Inter",sans-serif';ctx.fillStyle='#908fa0';
+    ctx.fillText(' shipped fast with ',bx,botY);
+    bx-=shippedW;
+    ctx.font='500 18px "JetBrains Mono",monospace';ctx.fillStyle='#c0c1ff';
+    ctx.fillText('CC Hubber',bx,botY);
+
+    // Subtle shimmer sweep
     if(shimmerT!==undefined){
-      var sx=-w*0.3+(shimmerT%1)*w*1.6;
-      var sg=ctx.createLinearGradient(sx,0,sx+w*0.2,h);
+      var sx=-w*0.4+(shimmerT%1)*w*1.8;
+      var sg=ctx.createLinearGradient(sx,0,sx+w*0.3,h);
       sg.addColorStop(0,'rgba(255,255,255,0)');
-      sg.addColorStop(0.45,'rgba(192,193,255,0.03)');
-      sg.addColorStop(0.5,'rgba(255,255,255,0.08)');
-      sg.addColorStop(0.55,'rgba(212,187,255,0.03)');
+      sg.addColorStop(0.45,'rgba(192,193,255,0.02)');
+      sg.addColorStop(0.5,'rgba(255,255,255,0.045)');
+      sg.addColorStop(0.55,'rgba(212,187,255,0.02)');
       sg.addColorStop(1,'rgba(255,255,255,0)');
       ctx.fillStyle=sg;ctx.fillRect(0,0,w,h);
     }
