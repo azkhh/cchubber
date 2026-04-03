@@ -893,18 +893,22 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
           var stream=vidCanvas.captureStream(30);
           var chunks=[];
-          var recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:30000000});
+          // Prefer MP4 (Chrome 124+, works on X/Twitter), fallback WebM
+          var mime=MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')?'video/mp4;codecs=avc1'
+            :MediaRecorder.isTypeSupported('video/mp4')?'video/mp4':'video/webm';
+          var ext=mime.startsWith('video/mp4')?'mp4':'webm';
+          var recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:30000000});
           recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};
           recorder.onstop=function(){
-            var blob=new Blob(chunks,{type:'video/mp4'});
-            var a=document.createElement('a');a.download='cchubber-card.mp4';
+            var blob=new Blob(chunks,{type:mime.split(';')[0]});
+            var a=document.createElement('a');a.download='cchubber-card.'+ext;
             a.href=URL.createObjectURL(blob);a.click();
             gb.innerHTML='<span class="material-symbols-outlined text-sm">videocam</span> Save Video';
-            gb.disabled=false;showToast('Video saved');
+            gb.disabled=false;showToast('Video saved ('+ext.toUpperCase()+')');
           };
 
-          var duration=6000,startTime=null;
-          recorder.start(50);
+          var duration=4000,startTime=null; // 4 sec — short enough for all platforms
+          recorder.start(100);
 
           function frame(ts){
             if(!startTime)startTime=ts;
