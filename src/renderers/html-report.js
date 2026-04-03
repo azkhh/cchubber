@@ -447,7 +447,10 @@ ${inflection && inflection.multiplier >= 1.5 ? `
           const sev = sevColorMap[r.severity] || sevColorMap.info;
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
-              <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
+              <div class="flex items-start justify-between gap-4">
+                <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
+                ${r.savings ? `<span class="text-[10px] font-mono shrink-0 px-2 py-0.5 rounded" style="background:${sev.border}18;color:${sev.text}">${r.savings}</span>` : ''}
+              </div>
               <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${r.action}</p>
             </div>
           </div>`;
