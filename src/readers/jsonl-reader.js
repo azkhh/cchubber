@@ -243,7 +243,7 @@ export function aggregateByProject(entries, claudeDir) {
   }
 
   // Decode project paths from directory names
-  // Claude Code encodes paths as: C--Users-asmir-Documents-Project-Name
+  // Claude Code encodes paths as: C--Users-username-Documents-Project-Name
   // Decode: replace leading drive letter pattern, split on -, take last meaningful segments
   for (const proj of Object.values(byProject)) {
     proj.sessionCount = proj.sessions.size;
@@ -268,8 +268,8 @@ function cleanModelName(name) {
 
 /**
  * Decode Claude Code's encoded project directory name into a readable path and name.
- * Format: C--Users-asmir-Documents-Obsidian-Architect-OS-01-Projects-My-Project
- * Becomes: C:/Users/asmir/Documents/.../My-Project → name: "My-Project"
+ * Format: C--Users-username-Documents-Projects-My-Project
+ * Becomes: C:/Users/username/Documents/.../My-Project → name: "My-Project"
  */
 function decodeProjectHash(hash) {
   if (!hash || hash === 'unknown') return { path: null, name: 'Unknown' };
