@@ -919,27 +919,21 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             if(elapsed>=duration){setTimeout(function(){recorder.stop()},300);return}
 
             var t=elapsed/duration;
-            // Perspective tilt via strip rendering — simulates CSS rotateY
-            var ease=Math.sin(t*Math.PI*2); // smooth +-1 oscillation
-            var tiltAmount=ease*0.025; // how much perspective distortion
+            // Gentle breathe + float — matches the natural feel of the CSS animation
+            // ease-in-out via cosine (same curve as CSS ease-in-out)
+            var ease=0.5-0.5*Math.cos(t*Math.PI*2);
+            var scaleAmt=1+ease*0.012; // breathe: 1.0 to 1.012
+            var floatX=(ease-0.5)*8; // +-4px horizontal drift
+            var floatY=Math.sin(t*Math.PI*4)*3; // tiny vertical bob
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
+            vctx.save();
+            vctx.translate(VW/2+floatX,VH/2+floatY);
+            vctx.scale(scaleAmt,scaleAmt);
+            vctx.translate(-cw/2,-ch/2);
 
-            // Draw card as vertical strips with varying height = perspective tilt
-            var strips=40;
-            var stripW=cw/strips;
-            var ox=Math.round((VW-cw)/2);
-            var oy=Math.round((VH-ch)/2);
-
-            for(var s=0;s<strips;s++){
-              var stripPos=(s/strips)-0.5; // -0.5 to 0.5
-              var perspScale=1+stripPos*tiltAmount*2; // one side bigger, other smaller
-              var dstH=Math.round(ch*perspScale);
-              var dstY=oy+Math.round((ch-dstH)/2);
-              var srcX=Math.round(s*(img.width/strips));
-              var srcW=Math.ceil(img.width/strips)+1;
-              vctx.drawImage(img,srcX,0,srcW,img.height,ox+s*stripW,dstY,Math.ceil(stripW)+1,dstH);
-            }
+            // Draw the HTML-captured card image (browser-quality)
+            vctx.drawImage(img,0,0,cw,ch);
 
             // Shimmer overlay
             var sx=-cw*0.4+(t%1)*cw*1.8;
