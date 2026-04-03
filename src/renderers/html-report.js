@@ -930,20 +930,27 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             var t=elapsed/duration;
             // Gentle breathe + float — matches the natural feel of the CSS animation
             // ease-in-out via cosine (same curve as CSS ease-in-out)
-            // Pure horizontal drift — no zoom, no bob, just lateral movement
-            var drift=Math.sin(t*Math.PI*2)*14; // +-14px, smooth sine, matches rotateY feel
+            // Gentle lateral drift — subtle, no shake
+            var drift=Math.sin(t*Math.PI*2)*5;
 
             vctx.fillStyle='#000';vctx.fillRect(0,0,VW,VH);
             vctx.save();
-            vctx.translate(Math.round((VW-cw)/2+drift),Math.round((VH-ch)/2));
+            vctx.translate((VW-cw)/2+drift,(VH-ch)/2);
 
             // Draw the HTML-captured card image (browser-quality)
             vctx.drawImage(img,0,0,cw,ch);
 
-            // Shimmer — matches CSS ::before (angled sweep, same opacity)
-            var shimProgress=(t*2)%1; // 2 sweeps per 6 seconds
+            // Clip shimmer + noise to rounded card shape (prevents corner bleed)
+            var cr=22*scale;
+            vctx.beginPath();
+            vctx.moveTo(cr,0);vctx.lineTo(cw-cr,0);vctx.quadraticCurveTo(cw,0,cw,cr);
+            vctx.lineTo(cw,ch-cr);vctx.quadraticCurveTo(cw,ch,cw-cr,ch);vctx.lineTo(cr,ch);
+            vctx.quadraticCurveTo(0,ch,0,ch-cr);vctx.lineTo(0,cr);vctx.quadraticCurveTo(0,0,cr,0);
+            vctx.closePath();vctx.clip();
+
+            // Shimmer sweep
+            var shimProgress=(t*2)%1;
             var sx=-cw*0.5+shimProgress*cw*2;
-            // Angled gradient (top-left to bottom-right like CSS 105deg)
             var g=vctx.createLinearGradient(sx,0,sx+cw*0.4,ch);
             g.addColorStop(0,'rgba(255,255,255,0)');
             g.addColorStop(0.3,'rgba(192,193,255,0.04)');
@@ -953,7 +960,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
             g.addColorStop(1,'rgba(255,255,255,0)');
             vctx.fillStyle=g;vctx.fillRect(0,0,cw,ch);
 
-            // Noise dither — breaks up gradient banding from video compression
+            // Noise dither
             var pat=vctx.createPattern(noiseC,'repeat');
             vctx.fillStyle=pat;vctx.globalAlpha=0.4;vctx.fillRect(0,0,cw,ch);vctx.globalAlpha=1;
 
