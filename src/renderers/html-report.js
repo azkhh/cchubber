@@ -490,7 +490,44 @@ ${inflection && inflection.multiplier >= 1.5 ? `
   </div>
 </section>
 
-<!-- 7. PROJECTS TABLE -->
+<!-- 7. COMMUNITY LEADERBOARD -->
+<section id="community-section" class="bg-[#1b1c1d] rounded-xl border border-[rgba(70,69,84,0.15)] overflow-hidden" style="display:none">
+  <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)]">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xl font-bold text-[#e3e2e3]">Community</h3>
+      <span id="community-count" class="text-[10px] font-mono text-[#908fa0]"></span>
+    </div>
+    <p id="community-percentile" class="text-sm text-[#908fa0] mt-1"></p>
+  </div>
+
+  <!-- Grade distribution bar -->
+  <div class="px-8 py-4 border-b border-[rgba(70,69,84,0.15)]">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-[10px] font-mono text-[#908fa0] uppercase tracking-wider">Grade Distribution</span>
+    </div>
+    <div id="grade-dist-bar" class="flex h-6 rounded overflow-hidden"></div>
+    <div id="grade-dist-labels" class="flex mt-1"></div>
+  </div>
+
+  <!-- Leaderboard table -->
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-[rgba(70,69,84,0.15)]">
+          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-left">#</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Grade</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Ratio</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Cost</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Opus %</th>
+          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Country</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 8. PROJECTS TABLE -->
 ${projectBreakdown && projectBreakdown.length > 0 ? `
 <section class="bg-[#1b1c1d] rounded-xl border border-[rgba(70,69,84,0.15)] overflow-hidden">
   <div class="px-8 py-6 border-b border-[rgba(70,69,84,0.15)] flex justify-between items-center">
@@ -1017,6 +1054,75 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   });
 
   setR('all');
+
+  // Community leaderboard — stats fetched at generation time, embedded as JSON
+  var MY_RATIO = ${cacheHealth.efficiencyRatio || 0};
+  var MY_GRADE = '${cacheHealth.grade?.letter || '?'}';
+  var gradeColors = {A:'#10b981',B:'#22d3ee',C:'#f59e0b',D:'#f97316',F:'#ef4444'};
+  var stats = ${JSON.stringify(report.communityStats || null)};
+
+  (function(stats){
+    if(!stats || !stats.totalReports) return;
+      var sec = document.getElementById('community-section');
+      if(!sec || !stats.totalReports) return;
+      sec.style.display = '';
+
+      // Count + percentile
+      var total = stats.totalReports || 0;
+      document.getElementById('community-count').textContent = total + ' users worldwide';
+
+      // Calculate percentile from recent entries
+      var recent = stats.recent || [];
+      var ratios = recent.map(function(r){return r.ratio||9999}).sort(function(a,b){return a-b});
+      var betterThan = ratios.filter(function(r){return r > MY_RATIO}).length;
+      var pctile = total > 0 ? Math.round(betterThan / ratios.length * 100) : 0;
+      document.getElementById('community-percentile').innerHTML =
+        'Your cache ratio of <strong style="color:#e3e2e3">' + MY_RATIO + ':1</strong> is better than <strong style="color:#c0c1ff">' + pctile + '%</strong> of CC Hubber users';
+
+      // Grade distribution bar
+      var grades = stats.grades || {};
+      var gTotal = Object.values(grades).reduce(function(s,v){return s+v},0);
+      var bar = document.getElementById('grade-dist-bar');
+      var labels = document.getElementById('grade-dist-labels');
+      ['A','B','C','D','F'].forEach(function(g){
+        var count = grades[g] || 0;
+        var pct = gTotal > 0 ? (count/gTotal*100) : 0;
+        if(pct > 0){
+          var seg = document.createElement('div');
+          seg.style.cssText = 'width:'+pct+'%;background:'+gradeColors[g]+';display:flex;align-items:center;justify-content:center;';
+          seg.innerHTML = '<span style="font-size:10px;font-weight:700;color:#0d0e0f">' + (pct>8?g:'') + '</span>';
+          bar.appendChild(seg);
+          var lbl = document.createElement('span');
+          lbl.style.cssText = 'width:'+pct+'%;text-align:center;font-size:10px;color:#908fa0;font-family:monospace;';
+          lbl.textContent = count;
+          labels.appendChild(lbl);
+        }
+      });
+
+      // Leaderboard table
+      var tbody = document.getElementById('leaderboard-body');
+      var sorted = recent.filter(function(r){return r.ratio}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
+      var myRank = -1;
+      sorted.forEach(function(entry, i){
+        if(myRank<0 && (entry.ratio||9999) >= MY_RATIO) myRank = i;
+      });
+      if(myRank<0) myRank = sorted.length;
+
+      var html = '';
+      sorted.forEach(function(entry, i){
+        var isMe = Math.abs((entry.ratio||0) - MY_RATIO) < 10 && entry.grade === MY_GRADE;
+        var rowStyle = isMe ? 'background:rgba(192,193,255,0.06);border-left:2px solid #c0c1ff;' : '';
+        html += '<tr style="border-bottom:1px solid rgba(70,69,84,0.1);'+rowStyle+'">';
+        html += '<td class="px-8 py-3 text-sm font-mono text-[#908fa0]">#'+(i+1)+'</td>';
+        html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[entry.grade||'C']+'">'+entry.grade+'</td>';
+        html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
+        html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
+        html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus||'?')+'%</td>';
+        html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(entry.country||'?')+'</td>';
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+  })(stats);
 })();
 </script>
 </body>
