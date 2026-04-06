@@ -40,6 +40,45 @@ export default {
       }
     }
 
+    // GET /stats-public — aggregate summary for leaderboard (no key, limited data)
+    if (request.method === 'GET' && new URL(request.url).pathname === '/stats-public') {
+      const list = await env.TELEMETRY.list({ limit: 1000 });
+      const entries = [];
+      for (const key of list.keys) {
+        const val = await env.TELEMETRY.get(key.name);
+        if (val) entries.push(JSON.parse(val));
+      }
+
+      // Public stats — no raw data, no dump, just aggregates + anonymous recent
+      const stats = {
+        totalReports: entries.length,
+        grades: {},
+        avgCacheRatio: 0,
+        countries: {},
+        platforms: {},
+      };
+
+      for (const e of entries) {
+        stats.grades[e.grade] = (stats.grades[e.grade] || 0) + 1;
+        stats.avgCacheRatio += e.cacheRatio || 0;
+        stats.countries[e._country] = (stats.countries[e._country] || 0) + 1;
+        stats.platforms[e.os] = (stats.platforms[e.os] || 0) + 1;
+      }
+
+      if (entries.length > 0) {
+        stats.avgCacheRatio = Math.round(stats.avgCacheRatio / entries.length);
+      }
+
+      // All entries — grade, ratio, cost bucket, country, os (no timestamps, no UIDs)
+      // Send all for accurate leaderboard ranking and percentile
+      stats.recent = entries.filter(e => e.cacheRatio).map(e => ({
+        grade: e.grade, ratio: e.cacheRatio, cost: e.totalCostBucket,
+        opus: e.opusPct, country: e._country, os: e.os, v: e.v,
+      }));
+
+      return new Response(JSON.stringify(stats, null, 2), { headers });
+    }
+
     // GET /stats — aggregate summary (password protected)
     if (request.method === 'GET' && new URL(request.url).pathname === '/stats') {
       const url = new URL(request.url);

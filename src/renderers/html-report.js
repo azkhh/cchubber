@@ -1122,25 +1122,51 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         }
       });
 
-      // Leaderboard table — re-graded
+      // Leaderboard table — re-graded, with user's position injected
       var tbody = document.getElementById('leaderboard-body');
       var sorted = recent.filter(function(r){return r.ratio}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
 
+      // Find where the user would rank
+      var myRank = sorted.findIndex(function(e){return (e.ratio||0) >= MY_RATIO});
+      if(myRank < 0) myRank = sorted.length;
+
+      // Show top 10 + user's position (if not in top 10)
+      var showIndices = [];
+      for(var si=0;si<Math.min(10,sorted.length);si++) showIndices.push(si);
+      var userInTop = myRank < 10;
+      if(!userInTop && myRank < sorted.length){
+        showIndices.push(-1); // separator
+        if(myRank > 0) showIndices.push(myRank-1);
+        showIndices.push(myRank);
+        if(myRank+1 < sorted.length) showIndices.push(myRank+1);
+      }
+
       var html = '';
-      sorted.forEach(function(entry, i){
+      for(var si2=0;si2<showIndices.length;si2++){
+        var idx = showIndices[si2];
+        if(idx === -1){
+          html += '<tr><td colspan="6" class="px-8 py-1 text-center text-[10px] text-[#908fa0]">···</td></tr>';
+          continue;
+        }
+        var entry = sorted[idx];
+        if(!entry) continue;
         var g = getGrade(entry);
-        var isMe = Math.abs((entry.ratio||0) - MY_RATIO) < 50;
-        var rowStyle = isMe ? 'background:rgba(192,193,255,0.06);border-left:2px solid #c0c1ff;' : '';
+        var isMe = idx === myRank;
+        var rowStyle = isMe ? 'background:rgba(192,193,255,0.08);border-left:3px solid #c0c1ff;' : '';
         html += '<tr style="border-bottom:1px solid rgba(70,69,84,0.1);'+rowStyle+'">';
-        html += '<td class="px-8 py-3 text-sm font-mono text-[#908fa0]">#'+(i+1)+'</td>';
+        html += '<td class="px-8 py-3 text-sm font-mono '+(isMe?'text-[#c0c1ff] font-bold':'text-[#908fa0]')+'">#'+(idx+1)+(isMe?' ← you':'')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[g]+'">'+g+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus||'?')+'%</td>';
         html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(entry.country||'?')+'</td>';
         html += '</tr>';
-      });
+      }
       tbody.innerHTML = html;
+
+      // Update percentile text with rank
+      document.getElementById('community-percentile').innerHTML =
+        'You\'re <strong style="color:#c0c1ff">#'+(myRank+1)+' of '+sorted.length+'</strong> users by cache efficiency. Better than <strong style="color:#c0c1ff">'+pctile+'%</strong>';
   })(stats);
 })();
 </script>
