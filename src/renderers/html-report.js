@@ -471,7 +471,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
           const sev = sevColorMap[r.severity] || sevColorMap.info;
           const safeTitle = r.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
           const safeAction = r.action.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          const clipboardText = `CC Hubber flagged this about my setup:\\n\\n${r.title}\\n\\n${r.action}\\n\\nPlease review my current config and suggest minimal, safe changes. Read the relevant files first before making any modifications. Do not break existing working functionality.`;
+          const clipboardText = `CC Hubber flagged this about my setup:\\n\\n${r.title}\\n\\n${r.action}\\n\\nBefore making changes:\\n1. Read the relevant files first to understand the current setup\\n2. Do NOT remove or modify anything without asking me — some things are there intentionally\\n3. Show me what each section/setting costs in tokens and let me decide what to keep\\n4. Suggest optimizations (move to skills, use hooks, restructure) rather than deletion\\n5. Do not break existing working functionality`;
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-4">
