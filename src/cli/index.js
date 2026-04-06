@@ -132,7 +132,7 @@ async function main() {
   const inflection = detectInflectionPoints(dailyFromJSONL);
   const sessionIntel = analyzeSessionIntelligence(sessionMeta, jsonlEntries);
   const modelRouting = analyzeModelRouting(costAnalysis, jsonlEntries);
-  const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection, sessionIntel, modelRouting);
+  const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection, sessionIntel, modelRouting, projectBreakdown);
 
   if (inflection) console.log(`  ✓ Inflection: ${inflection.summary}`);
   if (sessionIntel.available) console.log(`  ✓ ${sessionIntel.totalSessions} sessions analyzed (${sessionIntel.avgDuration} min avg)`);
