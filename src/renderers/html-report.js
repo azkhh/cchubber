@@ -1066,25 +1066,39 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       if(!sec || !stats.totalReports) return;
       sec.style.display = '';
 
-      // Count + percentile
-      var total = stats.totalReports || 0;
-      document.getElementById('community-count').textContent = total + ' users worldwide';
+      // Re-grade function — applies current grading logic to stored ratios
+      // so old telemetry entries get accurate grades, not the inflated v0.4 grades
+      function regrade(ratio){
+        // Simplified: ratio signal dominates (40%), assume stable trend (70), good hit rate (85), no breaks (100)
+        var rs;
+        if(ratio<=200)rs=100;else if(ratio<=350)rs=85;else if(ratio<=500)rs=70;
+        else if(ratio<=650)rs=55;else if(ratio<=800)rs=42;else if(ratio<=1000)rs=30;
+        else if(ratio<=1500)rs=18;else if(ratio<=2000)rs=10;else rs=3;
+        var composite=Math.round(85*0.15+rs*0.40+70*0.30+100*0.15);
+        if(rs<=5)composite=Math.min(composite,38);
+        if(composite>=75)return'A';if(composite>=60)return'B';if(composite>=45)return'C';if(composite>=30)return'D';return'F';
+      }
+
+      // Count + geographic spread (don't show raw user count — looks small early on)
+      var countries = stats.countries ? Object.keys(stats.countries) : [];
+      document.getElementById('community-count').textContent = countries.length + ' countries';
 
       // Calculate percentile from recent entries
       var recent = stats.recent || [];
       var ratios = recent.map(function(r){return r.ratio||9999}).sort(function(a,b){return a-b});
       var betterThan = ratios.filter(function(r){return r > MY_RATIO}).length;
-      var pctile = total > 0 ? Math.round(betterThan / ratios.length * 100) : 0;
+      var pctile = ratios.length > 0 ? Math.round(betterThan / ratios.length * 100) : 0;
       document.getElementById('community-percentile').innerHTML =
         'Your cache ratio of <strong style="color:#e3e2e3">' + MY_RATIO + ':1</strong> is better than <strong style="color:#c0c1ff">' + pctile + '%</strong> of CC Hubber users';
 
-      // Grade distribution bar
-      var grades = stats.grades || {};
-      var gTotal = Object.values(grades).reduce(function(s,v){return s+v},0);
+      // Grade distribution bar — re-graded from ratios
+      var regraded = {A:0,B:0,C:0,D:0,F:0};
+      recent.forEach(function(r){if(r.ratio)regraded[regrade(r.ratio)]++});
+      var gTotal = Object.values(regraded).reduce(function(s,v){return s+v},0);
       var bar = document.getElementById('grade-dist-bar');
       var labels = document.getElementById('grade-dist-labels');
       ['A','B','C','D','F'].forEach(function(g){
-        var count = grades[g] || 0;
+        var count = regraded[g] || 0;
         var pct = gTotal > 0 ? (count/gTotal*100) : 0;
         if(pct > 0){
           var seg = document.createElement('div');
@@ -1098,22 +1112,18 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         }
       });
 
-      // Leaderboard table
+      // Leaderboard table — re-graded
       var tbody = document.getElementById('leaderboard-body');
       var sorted = recent.filter(function(r){return r.ratio}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
-      var myRank = -1;
-      sorted.forEach(function(entry, i){
-        if(myRank<0 && (entry.ratio||9999) >= MY_RATIO) myRank = i;
-      });
-      if(myRank<0) myRank = sorted.length;
 
       var html = '';
       sorted.forEach(function(entry, i){
-        var isMe = Math.abs((entry.ratio||0) - MY_RATIO) < 10 && entry.grade === MY_GRADE;
+        var g = regrade(entry.ratio);
+        var isMe = Math.abs((entry.ratio||0) - MY_RATIO) < 50;
         var rowStyle = isMe ? 'background:rgba(192,193,255,0.06);border-left:2px solid #c0c1ff;' : '';
         html += '<tr style="border-bottom:1px solid rgba(70,69,84,0.1);'+rowStyle+'">';
         html += '<td class="px-8 py-3 text-sm font-mono text-[#908fa0]">#'+(i+1)+'</td>';
-        html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[entry.grade||'C']+'">'+entry.grade+'</td>';
+        html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[g]+'">'+g+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus||'?')+'%</td>';
