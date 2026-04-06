@@ -42,7 +42,8 @@ const flags = {
   })(),
   days: (() => {
     const idx = args.indexOf('--days') !== -1 ? args.indexOf('--days') : args.indexOf('-d');
-    return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1], 10) : 30;
+    const val = idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1], 10) : 30;
+    return isNaN(val) ? 30 : val;
   })(),
 };
 
@@ -140,19 +141,15 @@ async function main() {
   if (modelRouting.available) console.log(`  ✓ Model routing: ${modelRouting.opusPct}% Opus, ${modelRouting.sonnetPct}% Sonnet`);
   console.log(`  ✓ ${projectBreakdown.length} projects detected`);
 
-  // Fetch community stats for leaderboard (non-blocking, fails silently)
+  // Fetch community stats for leaderboard (non-blocking, 5s timeout, fails silently)
   let communityStats = null;
   try {
-    const res = await fetch('https://cchubber-telemetry.asmirkhan087.workers.dev/stats?key=cchubber_public_readonly');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://cchubber-telemetry.asmirkhan087.workers.dev/stats-public', { signal: controller.signal });
+    clearTimeout(timeout);
     if (res.ok) communityStats = await res.json();
   } catch {}
-  // Fallback: try the private key if public isn't configured
-  if (!communityStats) {
-    try {
-      const res = await fetch('https://cchubber-telemetry.asmirkhan087.workers.dev/stats?key=cchubber_x9k_private');
-      if (res.ok) communityStats = await res.json();
-    } catch {}
-  }
   if (communityStats) console.log(`  ✓ Community data: ${communityStats.totalReports} users from ${Object.keys(communityStats.countries || {}).length} countries`);
   else console.log('  ○ Community data unavailable (offline)');
 

@@ -83,7 +83,7 @@ function calculateGrade(allTimeRatio, breaks, days, dailyFromJSONL, cacheHitRate
   // Based on token-optimizer's methodology (multi-signal composite)
   // but adapted for post-hoc analysis with the data CC Hubber has.
 
-  // --- Signal 1: Cache hit rate (25%) ---
+  // --- Signal 1: Cache hit rate (15%) ---
   // What % of input tokens came from cache. Higher = better.
   // Thresholds from token-optimizer: >=80% = 100, >=60% = 80, >=40% = 55
   let hitRateScore;
@@ -93,7 +93,7 @@ function calculateGrade(allTimeRatio, breaks, days, dailyFromJSONL, cacheHitRate
   else if (cacheHitRate >= 40) hitRateScore = 40;
   else hitRateScore = 15;
 
-  // --- Signal 2: Efficiency ratio (30%) ---
+  // --- Signal 2: Efficiency ratio (40%) ---
   // Cache reads per output token. Measures how much redundant data
   // is re-read per unit of work. Lower = more efficient.
   // Calibrated against 33 real users (median ~680).

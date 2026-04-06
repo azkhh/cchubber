@@ -1,3 +1,8 @@
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 export function renderHTML(report) {
   const { costAnalysis, cacheHealth, anomalies, inflection, sessionIntel, modelRouting, projectBreakdown, claudeMdStack, oauthUsage, recommendations, generatedAt } = report;
 
@@ -474,13 +479,13 @@ ${inflection && inflection.multiplier >= 1.5 ? `
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-4">
-                <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
+                <p class="text-[13px] font-semibold text-[#e3e2e3]">${esc(r.title)}</p>
                 <div class="flex items-center gap-2 shrink-0">
                   ${r.savings ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:${sev.border}18;color:${sev.text}">${r.savings}</span>` : ''}
                   ${r.severity !== 'positive' ? `<button data-clip="${b64}" onclick="var t=atob(this.dataset.clip);navigator.clipboard.writeText(t);this.textContent='Copied!';var b=this;setTimeout(function(){b.textContent='Fix with Claude'},1500)" class="text-[10px] font-mono px-2 py-0.5 rounded border border-[rgba(70,69,84,0.3)] text-[#908fa0] cursor-pointer hover:text-[#e3e2e3] hover:border-[rgba(70,69,84,0.6)] transition-colors">Fix with Claude</button>` : ''}
                 </div>
               </div>
-              <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${r.action}</p>
+              <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${esc(r.action)}</p>
             </div>
           </div>`;
         }).join('')}
@@ -619,7 +624,7 @@ ${anomalies.hasAnomalies ? `
       </thead>
       <tbody class="divide-y divide-[rgba(70,69,84,0.15)]">
         ${claudeMdStack.globalSections.map(s => `<tr class="tbl-row">
-          <td class="px-8 py-3 text-sm text-[#e3e2e3]">${s.name}</td>
+          <td class="px-8 py-3 text-sm text-[#e3e2e3]">${esc(s.name)}</td>
           <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.lines}</td>
           <td class="px-8 py-3 font-mono text-sm text-[#c7c4d7] text-right">${s.tokens.toLocaleString()}</td>
         </tr>`).join('')}
@@ -1094,7 +1099,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       // Grade distribution — use stored grade for v0.5+ entries, regrade older ones
       function getGrade(entry){
         var v = entry.v || entry.version || '0.3.3';
-        var isNew = v >= '0.5';
+        var parts = v.split('.'); var isNew = (parseInt(parts[0]||0)>0) || (parseInt(parts[1]||0)>=5);
         return (isNew && entry.grade) ? entry.grade : (entry.ratio ? regrade(entry.ratio) : (entry.grade || 'C'));
       }
       var regraded = {A:0,B:0,C:0,D:0,F:0};
