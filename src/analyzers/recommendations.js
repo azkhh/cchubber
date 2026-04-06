@@ -60,17 +60,20 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
   }
 
   // 3. Project cost hotspot — identifies the most expensive project
+  // projectBreakdown has token counts but not cost. Use output tokens as proxy
+  // (output tokens dominate cost at $25/M for Opus vs $5/M for input).
   if (projectBreakdown && projectBreakdown.length > 1) {
-    const sorted = [...projectBreakdown].sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0));
+    const totalOutput = projectBreakdown.reduce((s, p) => s + (p.outputTokens || 0), 0);
+    const sorted = [...projectBreakdown].sort((a, b) => (b.outputTokens || 0) - (a.outputTokens || 0));
     const top = sorted[0];
-    if (top && top.totalCost > 0) {
-      const pct = Math.round((top.totalCost / totalCost) * 100);
-      if (pct > 40) {
+    if (top && totalOutput > 0) {
+      const pct = Math.round(((top.outputTokens || 0) / totalOutput) * 100);
+      if (pct > 30) {
         recs.push({
           severity: 'info',
-          title: `"${top.name}" uses ${pct}% of your total spend ($${Math.round(top.totalCost)})`,
+          title: `"${top.name}" uses ${pct}% of output tokens (${sorted.length} projects total)`,
           savings: 'Focus optimization here first',
-          action: `Your most expensive project. ${sorted.length} projects total. Consider whether this project needs Opus or if Sonnet would work. Splitting large tasks into smaller sessions reduces context bloat.`,
+          action: `Your most active project by output. ${top.messageCount || 0} messages across ${top.sessionCount || 0} sessions. Consider whether this project needs Opus or if Sonnet would work. Splitting large tasks into smaller sessions reduces context bloat.`,
         });
       }
     }

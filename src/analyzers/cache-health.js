@@ -140,7 +140,7 @@ function calculateGrade(allTimeRatio, breaks, days, dailyFromJSONL, cacheHitRate
 
   // --- Signal 4: Break frequency (15%) ---
   // Cache breaks per active day. More breaks = worse.
-  const activeDays = dailyFromJSONL ? dailyFromJSONL.length : (days > 0 ? days : 1);
+  const activeDays = (dailyFromJSONL && dailyFromJSONL.length > 0) ? dailyFromJSONL.length : Math.max(days, 1);
   const estimatedBreaks = breaks > 0 ? breaks : 0;
   const breaksPerDay = activeDays > 0 ? estimatedBreaks / activeDays : 0;
   let breakScore;
