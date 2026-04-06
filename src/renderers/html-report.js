@@ -469,11 +469,17 @@ ${inflection && inflection.multiplier >= 1.5 ? `
       <div class="space-y-3">
         ${recommendations.map(r => {
           const sev = sevColorMap[r.severity] || sevColorMap.info;
+          const safeTitle = r.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const safeAction = r.action.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const clipboardText = `CC Hubber flagged this about my setup:\\n\\n${r.title}\\n\\n${r.action}\\n\\nPlease review my current config and suggest minimal, safe changes. Read the relevant files first before making any modifications. Do not break existing working functionality.`;
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-4">
                 <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
-                ${r.savings ? `<span class="text-[10px] font-mono shrink-0 px-2 py-0.5 rounded" style="background:${sev.border}18;color:${sev.text}">${r.savings}</span>` : ''}
+                <div class="flex items-center gap-2 shrink-0">
+                  ${r.savings ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:${sev.border}18;color:${sev.text}">${r.savings}</span>` : ''}
+                  ${r.severity !== 'positive' ? `<button onclick="navigator.clipboard.writeText('${clipboardText}');this.textContent='Copied!';setTimeout(()=>this.textContent='Fix with Claude',1500)" class="text-[10px] font-mono px-2 py-0.5 rounded border border-[rgba(70,69,84,0.3)] text-[#908fa0] cursor-pointer hover:text-[#e3e2e3] hover:border-[rgba(70,69,84,0.6)] transition-colors">Fix with Claude</button>` : ''}
+                </div>
               </div>
               <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${r.action}</p>
             </div>
@@ -498,7 +504,8 @@ ${projectBreakdown && projectBreakdown.length > 0 ? `
           <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Project</th>
           <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Messages</th>
           <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Sessions</th>
-          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Output</th>
+          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Est. Cost</th>
+          <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Output</th>
           <th class="px-8 py-4 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Cache Read</th>
         </tr>
       </thead>
@@ -679,9 +686,11 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       h+='<td class="px-8 py-4 text-sm font-semibold text-[#e3e2e3]"><span class="proj-name">'+p.name+'</span>';
       if(p.path)h+='<br><span class="proj-path text-[10px] text-[#908fa0] font-mono">'+p.path+'</span>';
       h+='</td>';
+      var projCost=p.output/1e6*OUT+p.cacheRead/1e6*CACHE_R+p.input/1e6*INP+p.cacheWrite/1e6*CW;
       h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">'+p.messages.toLocaleString()+'</td>';
       h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">'+p.sessions+'</td>';
-      h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7]">'+ft(p.output)+'</td>';
+      h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7] text-right">'+fc(projCost)+'</td>';
+      h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7] text-right">'+ft(p.output)+'</td>';
       h+='<td class="px-8 py-4 font-mono text-sm text-[#c7c4d7] text-right">'+ft(p.cacheRead)+'</td>';
       h+='</tr>';
     }
