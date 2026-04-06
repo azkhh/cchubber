@@ -35,15 +35,15 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     });
   }
 
-  // 1. Model routing — biggest actionable saving for most users
+  // 1. Model routing — smart subagent delegation
   const opusPct = modelRouting?.opusPct || 0;
+  const subagentPct = modelRouting?.subagentPct || 0;
   if (opusPct > 80) {
-    const diff = opusPct - community.avgOpusPct;
     recs.push({
       severity: 'warning',
-      title: `${opusPct}% usage is Opus — route subagents to Sonnet`,
-      savings: `~${Math.round(opusPct * 0.4 * 0.8)}% usage reduction`,
-      action: `Set model: "sonnet" on Task/subagent calls. Sonnet handles search, file reads, docs, and simple edits at same quality. Community-verified: limits lasted 3-5x longer. Community average: ${community.avgOpusPct}% Opus.`,
+      title: `${opusPct}% usage is Opus — delegate routine subagent work`,
+      savings: `~${Math.round(opusPct * 0.3 * 0.7)}% usage reduction`,
+      action: `Keep Opus for your main thread. Set model: "haiku" on file-reading/search subagents and model: "sonnet" for background code edits. Haiku handles grep, glob, and doc lookups at 30x less cost. Lower effort level (/effort low) for routine tasks. Community average: ${community.avgOpusPct}% Opus.`,
     });
   }
 
@@ -129,17 +129,25 @@ export function generateRecommendations(costAnalysis, cacheHealth, claudeMdStack
     action: 'Prevents CC from reading node_modules/, dist/, *.lock, __pycache__/. Each context load scans your project tree — excluding junk saves tokens every turn.',
   });
 
-  // 8. Avoid --resume on older versions
-  if (cacheHealth.efficiencyRatio > 600) {
+  // 8. Tool search setting — one-line fix from token-optimizer findings
+  recs.push({
+    severity: 'info',
+    title: 'Enable tool search to reduce context by ~25K tokens',
+    savings: '~45% context reduction',
+    action: 'Add "ENABLE_TOOL_SEARCH": "true" to settings.json. Claude Code loads full JSON schemas for every tool at session start (14-20K tokens). Tool search loads them on-demand instead. One setting, instant savings.',
+  });
+
+  // 9. Cache expiry awareness
+  if (cacheHealth.efficiencyRatio > 500) {
     recs.push({
       severity: 'info',
-      title: 'Avoid --resume and --continue flags',
-      savings: '~$0.15 saved per resume',
-      action: 'These flags caused full prompt-cache misses in v2.1.69-2.1.89 (~$0.15 per resume on 500K context). Fixed in v2.1.90. Copy your last message and start fresh instead.',
+      title: 'Idle gaps > 5 min force full cache rebuild',
+      savings: '~10-30% usage reduction',
+      action: 'Anthropic\'s prompt cache expires after 5 minutes of inactivity. Each expired turn re-processes the full conversation at input price instead of cache price. Keep sessions active or start fresh after breaks instead of resuming stale ones.',
     });
   }
 
-  // 9. Prompt specificity
+  // 10. Prompt specificity
   recs.push({
     severity: 'info',
     title: 'Be specific in prompts — reduces tokens up to 10x',
