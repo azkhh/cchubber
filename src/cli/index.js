@@ -28,6 +28,7 @@ import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
 import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
+import { saveRun, getDelta, getHistory } from '../history.js';
 
 const args = process.argv.slice(2);
 const flags = {
@@ -152,12 +153,28 @@ async function main() {
     claudeMdStack,
     oauthUsage,
     recommendations,
+    history: getHistory(),
   };
 
   // Output
   if (flags.json) {
     console.log(JSON.stringify(report, null, 2));
     return;
+  }
+
+  // Track over time — save run, then compare against previous
+  const currentRun = saveRun(report);
+  const delta = getDelta(currentRun);
+  if (delta && delta.daysSince > 0) {
+    console.log(`  ✓ Compared to last run (${delta.daysSince}d ago):`);
+    if (delta.gradeChange) console.log(`    Grade: ${delta.gradeChange}`);
+    const ratioDir = delta.ratioChange > 0 ? '↑' : delta.ratioChange < 0 ? '↓' : '→';
+    console.log(`    Ratio: ${ratioDir} ${Math.abs(delta.ratioChange)} (${delta.prev.ratio}→${currentRun.ratio})`);
+    const scoreDir = delta.scoreChange > 0 ? '↑' : delta.scoreChange < 0 ? '↓' : '→';
+    console.log(`    Score: ${scoreDir} ${Math.abs(delta.scoreChange)} (${delta.prev.score}→${currentRun.score})`);
+    console.log('');
+  } else if (!delta) {
+    console.log('  ○ First run — future runs will show improvement tracking\n');
   }
 
   renderTerminal(report);
