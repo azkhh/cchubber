@@ -1091,9 +1091,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       document.getElementById('community-percentile').innerHTML =
         'Your cache ratio of <strong style="color:#e3e2e3">' + MY_RATIO + ':1</strong> is better than <strong style="color:#c0c1ff">' + pctile + '%</strong> of CC Hubber users';
 
-      // Grade distribution bar — re-graded from ratios
+      // Grade distribution — use stored grade for v0.5+ entries, regrade older ones
+      function getGrade(entry){
+        var v = entry.v || entry.version || '0.3.3';
+        var isNew = v >= '0.5';
+        return (isNew && entry.grade) ? entry.grade : (entry.ratio ? regrade(entry.ratio) : (entry.grade || 'C'));
+      }
       var regraded = {A:0,B:0,C:0,D:0,F:0};
-      recent.forEach(function(r){if(r.ratio)regraded[regrade(r.ratio)]++});
+      recent.forEach(function(r){regraded[getGrade(r)]++});
       var gTotal = Object.values(regraded).reduce(function(s,v){return s+v},0);
       var bar = document.getElementById('grade-dist-bar');
       var labels = document.getElementById('grade-dist-labels');
@@ -1118,7 +1123,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
       var html = '';
       sorted.forEach(function(entry, i){
-        var g = regrade(entry.ratio);
+        var g = getGrade(entry);
         var isMe = Math.abs((entry.ratio||0) - MY_RATIO) < 50;
         var rowStyle = isMe ? 'background:rgba(192,193,255,0.06);border-left:2px solid #c0c1ff;' : '';
         html += '<tr style="border-bottom:1px solid rgba(70,69,84,0.1);'+rowStyle+'">';
