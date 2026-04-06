@@ -467,18 +467,17 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <div class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
       <h3 class="text-xl font-bold text-[#e3e2e3] mb-6">Recommendations</h3>
       <div class="space-y-3">
-        ${recommendations.map(r => {
+        ${recommendations.map((r, idx) => {
           const sev = sevColorMap[r.severity] || sevColorMap.info;
-          const safeTitle = r.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          const safeAction = r.action.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          const clipboardText = `CC Hubber flagged this about my setup:\\n\\n${r.title}\\n\\n${r.action}\\n\\nBefore making changes:\\n1. Read the relevant files first to understand the current setup\\n2. Do NOT remove or modify anything without asking me — some things are there intentionally\\n3. Show me what each section/setting costs in tokens and let me decide what to keep\\n4. Suggest optimizations (move to skills, use hooks, restructure) rather than deletion\\n5. Do not break existing working functionality`;
+          const clipboardText = `CC Hubber flagged this about my setup:\n\n${r.title}\n\n${r.action}\n\nBefore making changes:\n1. Read the relevant files first to understand the current setup\n2. Do NOT remove or modify anything without asking me — some things are there intentionally\n3. Show me what each section/setting costs in tokens and let me decide what to keep\n4. Suggest optimizations (move to skills, use hooks, restructure) rather than deletion\n5. Do not break existing working functionality`;
+          const b64 = Buffer.from(clipboardText).toString('base64');
           return `<div class="p-4 bg-[#0d0e0f] rounded-r-lg flex items-start gap-4" style="border-left:3px solid ${sev.border}">
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-4">
                 <p class="text-[13px] font-semibold text-[#e3e2e3]">${r.title}</p>
                 <div class="flex items-center gap-2 shrink-0">
                   ${r.savings ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:${sev.border}18;color:${sev.text}">${r.savings}</span>` : ''}
-                  ${r.severity !== 'positive' ? `<button onclick="navigator.clipboard.writeText('${clipboardText}');this.textContent='Copied!';setTimeout(()=>this.textContent='Fix with Claude',1500)" class="text-[10px] font-mono px-2 py-0.5 rounded border border-[rgba(70,69,84,0.3)] text-[#908fa0] cursor-pointer hover:text-[#e3e2e3] hover:border-[rgba(70,69,84,0.6)] transition-colors">Fix with Claude</button>` : ''}
+                  ${r.severity !== 'positive' ? `<button data-clip="${b64}" onclick="var t=atob(this.dataset.clip);navigator.clipboard.writeText(t);this.textContent='Copied!';var b=this;setTimeout(function(){b.textContent='Fix with Claude'},1500)" class="text-[10px] font-mono px-2 py-0.5 rounded border border-[rgba(70,69,84,0.3)] text-[#908fa0] cursor-pointer hover:text-[#e3e2e3] hover:border-[rgba(70,69,84,0.6)] transition-colors">Fix with Claude</button>` : ''}
                 </div>
               </div>
               <p class="text-[11px] text-[#908fa0] mt-1 leading-relaxed">${r.action}</p>
