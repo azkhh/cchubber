@@ -748,7 +748,9 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
   function chart(d){
     if(!svg)return;
-    if(!d.length){svg.innerHTML='<text x="450" y="100" text-anchor="middle" fill="#908fa0" font-size="13" font-family="Inter,sans-serif">No data</text>';return}
+    if(!d.length){svg.innerHTML='<text x="450" y="100" text-anchor="middle" fill="#908fa0" font-size="13" font-family="Inter,sans-serif">No data for this period</text>';return}
+    var total=d.reduce(function(s,x){return s+x.cost},0);
+    if(total<0.01){svg.innerHTML='<text x="450" y="100" text-anchor="middle" fill="#908fa0" font-size="13" font-family="Inter,sans-serif">No cost data — costs are only calculated from token counts, not the costUSD field</text>';return}
     var mx=Math.max.apply(null,d.map(function(x){return x.cost}))*1.1;if(mx<0.01)mx=1;
     var s='';
     // grid lines
@@ -1166,7 +1168,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
 
       // Update percentile text with rank
       document.getElementById('community-percentile').innerHTML =
-        'You\'re <strong style="color:#c0c1ff">#'+(myRank+1)+' of '+sorted.length+'</strong> users by cache efficiency. Better than <strong style="color:#c0c1ff">'+pctile+'%</strong>';
+        "You are <strong style=\\"color:#c0c1ff\\">#"+(myRank+1)+" of "+sorted.length+"</strong> users by cache efficiency. Better than <strong style=\\"color:#c0c1ff\\">"+pctile+"%</strong>";
   })(stats);
 })();
 </script>
