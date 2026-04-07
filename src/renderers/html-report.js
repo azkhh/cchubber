@@ -372,6 +372,39 @@ ${inflection && inflection.multiplier >= 1.5 ? `
   <svg id="cost-chart-svg" viewBox="0 0 900 200" preserveAspectRatio="xMidYMid meet"></svg>
 </section>
 
+${report.valueTrend?.available ? `
+<!-- VALUE TREND -->
+<section class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
+  <div class="flex items-center justify-between mb-6">
+    <h3 class="text-xl font-bold text-[#e3e2e3]">Output Value</h3>
+    <span class="text-[10px] font-mono text-[#908fa0]">${report.valueTrend.trend === 'declining' ? 'DECLINING' : report.valueTrend.trend === 'improving' ? 'IMPROVING' : 'STABLE'}</span>
+  </div>
+  <div class="grid grid-cols-2 gap-6 mb-6">
+    <div class="bg-[#0d0e0f] p-5 rounded-lg">
+      <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-2">Tokens per Message</span>
+      <span class="font-mono text-2xl font-bold text-[#e3e2e3]">${report.valueTrend.avgOutputPerMsg.toLocaleString()}</span>
+      <span class="text-[10px] text-[#908fa0] block mt-1">avg output tokens per turn</span>
+    </div>
+    <div class="bg-[#0d0e0f] p-5 rounded-lg">
+      <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-2">Tokens per Dollar</span>
+      <span class="font-mono text-2xl font-bold text-[#e3e2e3]">${report.valueTrend.avgOutputPerDollar.toLocaleString()}</span>
+      <span class="text-[10px] text-[#908fa0] block mt-1">output tokens per $1 spent</span>
+    </div>
+  </div>
+  ${report.valueTrend.trendDetail ? `<p class="text-[12px] text-[#908fa0] mb-4">${esc(report.valueTrend.trendDetail)}</p>` : ''}
+  ${report.valueTrend.anomalies?.length > 0 ? `
+  <div class="space-y-2">
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block">Low Output Days (2+ SD below average)</span>
+    ${report.valueTrend.anomalies.slice(0, 5).map(a => `
+    <div class="p-3 bg-[#0d0e0f] rounded-lg flex items-center justify-between">
+      <span class="text-[12px] font-mono text-[#908fa0]">${a.date}</span>
+      <span class="text-[12px] text-[#e3e2e3]">${a.outputPerMsg} tokens/msg</span>
+      <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(255,180,171,0.15);color:#ffb4ab">${a.deviation}σ below</span>
+    </div>`).join('')}
+  </div>` : ''}
+</section>
+` : ''}
+
 <!-- 5. SESSION INTELLIGENCE + MODEL DISTRIBUTION -->
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 

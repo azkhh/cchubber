@@ -25,6 +25,7 @@ import { generateRecommendations } from '../analyzers/recommendations.js';
 import { detectInflectionPoints } from '../analyzers/inflection-detector.js';
 import { analyzeSessionIntelligence } from '../analyzers/session-intelligence.js';
 import { analyzeModelRouting } from '../analyzers/model-routing.js';
+import { analyzeValueTrend } from '../analyzers/value-tracker.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
 import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
@@ -134,6 +135,9 @@ async function main() {
   const inflection = detectInflectionPoints(dailyFromJSONL);
   const sessionIntel = analyzeSessionIntelligence(sessionMeta, jsonlEntries);
   const modelRouting = analyzeModelRouting(costAnalysis, jsonlEntries);
+  const valueTrend = analyzeValueTrend(dailyFromJSONL);
+  if (valueTrend.available) console.log(`  ✓ Value trend: ${valueTrend.avgOutputPerMsg} tokens/msg avg (${valueTrend.trend})`);
+
   const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection, sessionIntel, modelRouting, projectBreakdown);
 
   if (inflection) console.log(`  ✓ Inflection: ${inflection.summary}`);
@@ -166,6 +170,7 @@ async function main() {
     claudeMdStack,
     oauthUsage,
     recommendations,
+    valueTrend,
     communityStats,
     history: getHistory(),
   };

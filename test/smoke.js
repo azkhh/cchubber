@@ -134,7 +134,12 @@ test('No private API keys in HTML', () => {
   assert(!html.includes('cchubber_stats_'), 'Stats key found in HTML');
 });
 
-// 9. HTML escaping function exists
+// 9. Value trend section exists
+test('Output Value section exists', () => {
+  assert(html.includes('Output Value') || html.includes('Tokens per Message'), 'Missing Output Value section');
+});
+
+// 10. HTML escaping function exists
 test('escapeHtml function exists', () => {
   const src = readFileSync(join(ROOT, 'src/renderers/html-report.js'), 'utf-8');
   assert(src.includes('function esc('), 'Missing esc() function in html-report.js');
