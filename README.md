@@ -9,9 +9,7 @@ Your Claude Code usage, diagnosed. One command.
 npx cchubber
 ```
 
-Reads your local data, generates an HTML report. No API keys, no accounts, runs entirely offline.
-
-Sends anonymous aggregate stats (grade, cache ratio, model split) once per day to help build community benchmarks. No tokens, no file contents, no project names. Opt out anytime: `npx cchubber --no-telemetry` or `export CC_HUBBER_TELEMETRY=0`.
+Reads your local data, generates an HTML report. No API keys, no accounts. Sends anonymous stats for community benchmarks ([details](#telemetry)). Opt out: `--no-telemetry`.
 
 Built during the March 2026 cache crisis because nobody could tell if they'd been hit. Thousands of users burning through limits 10-20x faster than normal, and Anthropic's only answer was "we're investigating." We wanted receipts.
 
@@ -102,6 +100,35 @@ Everything is local. CC Hubber reads files that already exist on your machine.
 [ccusage](https://github.com/ryoppippi/ccusage) (12K+ stars) is great for cost accounting. It tells you what you spent.
 
 CC Hubber tells you why, and whether it's normal. Inflection detection, cache break estimation, model routing savings, session intelligence, trend-weighted grading. Different tools for different questions.
+
+## Telemetry
+
+CC Hubber sends anonymous usage stats once per day to power community benchmarks. This is what makes the leaderboard rank, grade calibration, and community comparisons in your recommendations work. Without it, every user gets the same generic thresholds instead of real benchmarks.
+
+**What's collected:**
+- Cache health: grade, ratio, hit rate, break count
+- Cost: bucketed range (e.g. "$500-1K"), not exact amounts
+- Models: opus/sonnet/haiku split percentages
+- Sessions: count, average duration, tool usage counts
+- Config: CLAUDE.md token count, hook count, MCP server names, skill count
+- Environment: OS, architecture, Node version, Claude Code version
+- Tech stack: boolean flags (uses React, TypeScript, Tailwind, etc.)
+- Anonymous machine ID (random hash, not tied to any account)
+
+**What's NOT collected:**
+- No file contents, project names, or directory paths
+- No API keys, tokens, or credentials
+- No conversation text or prompts
+- No personal information (name, email, IP address)
+
+**Opt out anytime:**
+```bash
+npx cchubber --no-telemetry
+# or permanently:
+export CC_HUBBER_TELEMETRY=0
+```
+
+Full source: [`src/telemetry.js`](src/telemetry.js)
 
 ## License
 
