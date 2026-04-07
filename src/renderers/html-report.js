@@ -1064,6 +1064,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   // Community leaderboard — stats fetched at generation time, embedded as JSON
   var MY_RATIO = ${cacheHealth.efficiencyRatio || 0};
   var MY_GRADE = '${cacheHealth.grade?.letter || '?'}';
+  var MY_COST = '${(() => { const c = totalCost; return c<10?'<10':c<50?'10-50':c<200?'50-200':c<500?'200-500':c<1000?'500-1K':c<5000?'1K-5K':'5K+'; })()}';
   var gradeColors = {A:'#10b981',B:'#22d3ee',C:'#f59e0b',D:'#f97316',F:'#ef4444'};
   var stats = ${JSON.stringify(report.communityStats || null)};
 
@@ -1125,8 +1126,10 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       });
 
       // Leaderboard table — re-graded, with user's position injected
+      // Filter: minimum activity to qualify (exclude <$10 and $10-50 users — too little data for meaningful grade)
+      var validCosts = {'50-200':1,'200-500':1,'500-1K':1,'1K-5K':1,'5K+':1};
       var tbody = document.getElementById('leaderboard-body');
-      var sorted = recent.filter(function(r){return r.ratio}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
+      var sorted = recent.filter(function(r){return r.ratio && (validCosts[r.cost] || r.cost===MY_COST)}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
 
       // Find where the user would rank
       var myRank = sorted.findIndex(function(e){return (e.ratio||0) >= MY_RATIO});
@@ -1160,7 +1163,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[g]+'">'+g+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
-        html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus||'?')+'%</td>';
+        html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus!=null?entry.opus:'?')+'%</td>';
         html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(entry.country||'?')+'</td>';
         html += '</tr>';
       }

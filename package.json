@@ -7,7 +7,9 @@
     "cchubber": "./src/cli/index.js"
   },
   "scripts": {
-    "start": "node src/cli/index.js"
+    "start": "node src/cli/index.js",
+    "test": "node test/smoke.js",
+    "release": "bash release.sh"
   },
   "keywords": [
     "claude",
