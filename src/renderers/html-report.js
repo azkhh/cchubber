@@ -1131,17 +1131,19 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       var tbody = document.getElementById('leaderboard-body');
       var sorted = recent.filter(function(r){return r.ratio && (validCosts[r.cost] || r.cost===MY_COST)}).sort(function(a,b){return (a.ratio||9999)-(b.ratio||9999)});
 
-      // Find where the user would rank
+      // Insert user's own entry into the sorted list at the right position
+      var myEntry = {ratio:MY_RATIO, grade:MY_GRADE, cost:MY_COST, opus:${report.modelRouting?.opusPct ?? 'null'}, country:'You', os:'${process.platform}', isMe:true};
       var myRank = sorted.findIndex(function(e){return (e.ratio||0) >= MY_RATIO});
       if(myRank < 0) myRank = sorted.length;
+      sorted.splice(myRank, 0, myEntry);
 
       // Show top 10 + user's position (if not in top 10)
       var showIndices = [];
       for(var si=0;si<Math.min(10,sorted.length);si++) showIndices.push(si);
       var userInTop = myRank < 10;
-      if(!userInTop && myRank < sorted.length){
+      if(!userInTop){
         showIndices.push(-1); // separator
-        if(myRank > 0) showIndices.push(myRank-1);
+        if(myRank > 1) showIndices.push(myRank-1);
         showIndices.push(myRank);
         if(myRank+1 < sorted.length) showIndices.push(myRank+1);
       }
@@ -1150,13 +1152,13 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
       for(var si2=0;si2<showIndices.length;si2++){
         var idx = showIndices[si2];
         if(idx === -1){
-          html += '<tr><td colspan="6" class="px-8 py-1 text-center text-[10px] text-[#908fa0]">···</td></tr>';
+          html += '<tr><td colspan="6" class="px-8 py-1 text-center text-[10px] text-[#908fa0]">...</td></tr>';
           continue;
         }
         var entry = sorted[idx];
         if(!entry) continue;
-        var g = getGrade(entry);
-        var isMe = idx === myRank;
+        var g = entry.isMe ? MY_GRADE : getGrade(entry);
+        var isMe = entry.isMe;
         var rowStyle = isMe ? 'background:rgba(192,193,255,0.08);border-left:3px solid #c0c1ff;' : '';
         html += '<tr style="border-bottom:1px solid rgba(70,69,84,0.1);'+rowStyle+'">';
         html += '<td class="px-8 py-3 text-sm font-mono '+(isMe?'text-[#c0c1ff] font-bold':'text-[#908fa0]')+'">#'+(idx+1)+(isMe?' ← you':'')+'</td>';
@@ -1164,14 +1166,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus!=null?entry.opus:'?')+'%</td>';
-        html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(entry.country||'?')+'</td>';
+        html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(isMe?'You':(entry.country||'?'))+'</td>';
         html += '</tr>';
       }
       tbody.innerHTML = html;
 
       // Update percentile text with rank
       document.getElementById('community-percentile').innerHTML =
-        "You are <strong style=\\"color:#c0c1ff\\">#"+(myRank+1)+" of "+sorted.length+"</strong> users by cache efficiency. Better than <strong style=\\"color:#c0c1ff\\">"+pctile+"%</strong>";
+        "You are <strong style=\\"color:#c0c1ff\\">#"+(myRank+1)+" of "+(sorted.length)+"</strong> users by cache efficiency. Better than <strong style=\\"color:#c0c1ff\\">"+pctile+"%</strong>";
   })(stats);
 })();
 </script>
