@@ -1,6 +1,6 @@
 {
   "name": "cchubber",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "What you spent. Why you spent it. Is that normal. — Claude Code usage diagnosis with beautiful HTML reports.",
   "type": "module",
   "bin": {
