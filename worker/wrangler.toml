@@ -1,9 +1,0 @@
-name = "cchubber-telemetry"
-main = "index.js"
-compatibility_date = "2024-01-01"
-
-[[kv_namespaces]]
-binding = "TELEMETRY"
-id = "5a4c9ce6201944ddbd5f78adb1e95f60"
-
-# STATS_KEY set via: npx wrangler secret put STATS_KEY

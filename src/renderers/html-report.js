@@ -18,6 +18,7 @@ export function renderHTML(report) {
 
   const dailyCostsJSON = JSON.stringify(dailyCosts.map(d => ({
     date: d.date, cost: d.cost, cacheOutputRatio: d.cacheOutputRatio || 0, isAnomaly: anomalyDates.has(d.date),
+    out: d.outputTokens || 0, inp: d.inputTokens || 0, cr: d.cacheReadTokens || 0,
   })));
 
   const projectsJSON = JSON.stringify((projectBreakdown || []).map(p => ({
@@ -353,6 +354,7 @@ ${inflection && inflection.multiplier >= 1.5 ? `
     <span class="font-mono text-2xl font-bold block text-[#e3e2e3]">${costAnalysis.sessions?.total || 0}</span>
     <span class="text-[10px] text-[#908fa0] mt-1 block font-mono">${costAnalysis.sessions?.avgDurationMinutes ? Math.round(costAnalysis.sessions.avgDurationMinutes) + ' min avg' : ''}</span>
   </div>`}
+
 </section>
 
 <!-- 4. COST TREND CHART -->
@@ -372,38 +374,61 @@ ${inflection && inflection.multiplier >= 1.5 ? `
   <svg id="cost-chart-svg" viewBox="0 0 900 200" preserveAspectRatio="xMidYMid meet"></svg>
 </section>
 
-${report.valueTrend?.available ? `
+${report.valueTrend?.available ? (() => {
+  const vt = report.valueTrend;
+  const comp = vt.comparison;
+  const trendColor = vt.trend === 'declining' ? '#ffb4ab' : vt.trend === 'improving' ? '#10b981' : '#908fa0';
+
+  // Build verdict around output per dollar — the metric people actually care about
+  let verdict, verdictColor, verdictDetail;
+  if (!comp || !comp.olderAvgPerDollar) {
+    verdict = 'Not enough data to compare yet. Run again next week.';
+    verdictColor = '#908fa0';
+    verdictDetail = '';
+  } else if (comp.dollarChangePct < -20) {
+    verdict = 'Yes. ' + Math.abs(comp.dollarChangePct) + '% less output per dollar recently.';
+    verdictColor = '#ffb4ab';
+    var limitImpact = Math.round(100 / (100 - Math.abs(comp.dollarChangePct)) * 100 - 100);
+    verdictDetail = 'Before: ' + comp.olderAvgPerDollar.toLocaleString() + ' tokens/$1. Now: ' + comp.recentAvgPerDollar.toLocaleString() + ' tokens/$1. In practice, your usage limits run out ~' + limitImpact + '% faster than before. This could be caused by cache changes, heavier Opus usage, or longer sessions.';
+  } else if (comp.dollarChangePct > 20) {
+    verdict = 'No. Actually getting ' + comp.dollarChangePct + '% more output per dollar recently.';
+    verdictColor = '#10b981';
+    verdictDetail = 'Before: ' + comp.olderAvgPerDollar.toLocaleString() + ' tokens/$1. Now: ' + comp.recentAvgPerDollar.toLocaleString() + ' tokens/$1.';
+  } else {
+    verdict = 'No. Your output per dollar is stable.';
+    verdictColor = '#10b981';
+    verdictDetail = comp.recentAvgPerDollar.toLocaleString() + ' output tokens per $1 (was ' + comp.olderAvgPerDollar.toLocaleString() + ').';
+  }
+
+  return `
 <!-- VALUE TREND -->
 <section class="bg-[#1b1c1d] p-8 rounded-xl border border-[rgba(70,69,84,0.15)]">
-  <div class="flex items-center justify-between mb-6">
-    <h3 class="text-xl font-bold text-[#e3e2e3]">Output Value</h3>
-    <span class="text-[10px] font-mono text-[#908fa0]">${report.valueTrend.trend === 'declining' ? 'DECLINING' : report.valueTrend.trend === 'improving' ? 'IMPROVING' : 'STABLE'}</span>
-  </div>
-  <div class="grid grid-cols-2 gap-6 mb-6">
-    <div class="bg-[#0d0e0f] p-5 rounded-lg">
-      <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-2">Tokens per Message</span>
-      <span class="font-mono text-2xl font-bold text-[#e3e2e3]">${report.valueTrend.avgOutputPerMsg.toLocaleString()}</span>
-      <span class="text-[10px] text-[#908fa0] block mt-1">avg output tokens per turn</span>
-    </div>
-    <div class="bg-[#0d0e0f] p-5 rounded-lg">
-      <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-2">Tokens per Dollar</span>
-      <span class="font-mono text-2xl font-bold text-[#e3e2e3]">${report.valueTrend.avgOutputPerDollar.toLocaleString()}</span>
-      <span class="text-[10px] text-[#908fa0] block mt-1">output tokens per $1 spent</span>
-    </div>
-  </div>
-  ${report.valueTrend.trendDetail ? `<p class="text-[12px] text-[#908fa0] mb-4">${esc(report.valueTrend.trendDetail)}</p>` : ''}
-  ${report.valueTrend.anomalies?.length > 0 ? `
-  <div class="space-y-2">
-    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block">Low Output Days (2+ SD below average)</span>
-    ${report.valueTrend.anomalies.slice(0, 5).map(a => `
+  <h3 class="text-xl font-bold text-[#e3e2e3] mb-4">Are you getting less for your money?</h3>
+  <p class="text-[15px] font-semibold mb-1" style="color:${verdictColor}">${verdict}</p>
+  ${verdictDetail ? '<p class="text-[12px] text-[#908fa0] mb-2">' + verdictDetail + '</p>' : ''}
+  ${inflection ? '<p class="text-[11px] text-[#908fa0] mb-4">A cache change was detected on ' + esc(inflection.date) + '. Your recent 7 days reflect where you are now.</p>' : ''}
+
+  ${(vt.anomalies?.length > 0 || vt.costAnomalies?.length > 0) ? `
+  <div class="mt-6 space-y-2">
+    ${vt.anomalies?.length > 0 ? `
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mb-1">Days with unusually short responses</span>
+    ${vt.anomalies.slice(0, 3).map(a => `
     <div class="p-3 bg-[#0d0e0f] rounded-lg flex items-center justify-between">
-      <span class="text-[12px] font-mono text-[#908fa0]">${a.date}</span>
-      <span class="text-[12px] text-[#e3e2e3]">${a.outputPerMsg} tokens/msg</span>
-      <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(255,180,171,0.15);color:#ffb4ab">${a.deviation}σ below</span>
-    </div>`).join('')}
+      <span class="text-[11px] font-mono text-[#908fa0]">${a.date}</span>
+      <span class="text-[11px] text-[#e3e2e3]">~${Math.round(a.outputPerMsg / 1.3)} words/response</span>
+      <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(255,180,171,0.15);color:#ffb4ab">${a.deviation}σ below avg</span>
+    </div>`).join('')}` : ''}
+    ${vt.costAnomalies?.length > 0 ? `
+    <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0] block mt-3 mb-1">Days where each message cost more than usual (${vt.costAnomalies.length} days)</span>
+    ${vt.costAnomalies.slice(0, 5).map(a => `
+    <div class="p-3 bg-[#0d0e0f] rounded-lg grid" style="grid-template-columns:100px 1fr auto;gap:12px;align-items:center">
+      <span class="text-[11px] font-mono text-[#908fa0]">${a.date}</span>
+      <span class="text-[11px] text-[#e3e2e3]">$${a.costPerMsg}/msg vs $${a.medianCostPerMsg} median</span>
+      <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(255,180,171,0.15);color:#ffb4ab">${a.multiplier}x</span>
+    </div>`).join('')}` : ''}
   </div>` : ''}
-</section>
-` : ''}
+</section>`;
+})() : ''}
 
 <!-- 5. SESSION INTELLIGENCE + MODEL DISTRIBUTION -->
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -554,9 +579,9 @@ ${report.valueTrend?.available ? `
           <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-left">#</th>
           <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Grade</th>
           <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Ratio</th>
-          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Cost</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-left">Cost</th>
           <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-right">Opus %</th>
-          <th class="px-8 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0]">Country</th>
+          <th class="px-4 py-3 text-[10px] uppercase font-bold tracking-[0.05em] text-[#908fa0] text-left">Country</th>
         </tr>
       </thead>
       <tbody id="leaderboard-body"></tbody>
@@ -817,13 +842,14 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
     // hover targets
     d.forEach(function(x,j){
       var px=PD.l+(d.length===1?cW/2:j*step),py=PD.t+cH-(x.cost/mx)*cH;
-      s+='<circle cx="'+px+'" cy="'+py+'" r="14" fill="transparent" data-d="'+x.date+'" data-c="'+x.cost+'" data-a="'+(x.isAnomaly?1:0)+'" class="hov" style="cursor:crosshair"/>';
+      s+='<circle cx="'+px+'" cy="'+py+'" r="14" fill="transparent" data-d="'+x.date+'" data-c="'+x.cost+'" data-a="'+(x.isAnomaly?1:0)+'" data-o="'+(x.out||0)+'" class="hov" style="cursor:crosshair"/>';
     });
     svg.innerHTML=s;
     svg.querySelectorAll('.hov').forEach(function(el){
       el.addEventListener('mouseenter',function(e){
         ttd.textContent=e.target.dataset.d;
-        ttc.textContent=fc(parseFloat(e.target.dataset.c));
+        var ot=parseInt(e.target.dataset.o||0);
+        ttc.textContent=fc(parseFloat(e.target.dataset.c))+(ot>0?' — '+ft(ot)+' output':'');
         tta.textContent=e.target.dataset.a==='1'?'ANOMALY':'';
         tta.style.display=e.target.dataset.a==='1'?'block':'none';
         tt.classList.add('on');
@@ -838,7 +864,7 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
   function setR(r){
     var f=filt(r);chart(f);
     var ci=document.getElementById('chart-info');
-    if(ci&&f.length){var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length;ci.textContent=a+' days \u00b7 '+fc(t)}
+    if(ci&&f.length){var t=f.reduce(function(s,x){return s+x.cost},0),a=f.filter(function(x){return x.cost>0}).length,tok=f.reduce(function(s,x){return s+(x.out||0)},0);ci.textContent=a+' days \u00b7 '+fc(t)+' \u00b7 '+ft(tok)+' output'}
     var rl=document.getElementById('range-lbl');if(rl)rl.textContent=RL[r]||'All time';
     CARD.range=RL[r]||'All time';
     var cr=document.getElementById('card-range');if(cr)cr.textContent=CARD.range;
@@ -1197,9 +1223,9 @@ ${cacheHealth.totalCacheBreaks > 0 ? `
         html += '<td class="px-8 py-3 text-sm font-mono '+(isMe?'text-[#c0c1ff] font-bold':'text-[#908fa0]')+'">#'+(idx+1)+(isMe?' ← you':'')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-bold text-center" style="color:'+gradeColors[g]+'">'+g+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.ratio||'?')+':1</td>';
-        html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost||'?')+'</td>';
+        html += '<td class="px-4 py-3 text-sm font-mono text-[#908fa0]">'+(entry.cost?'$'+entry.cost:'?')+'</td>';
         html += '<td class="px-4 py-3 text-sm font-mono text-[#c7c4d7] text-right">'+(entry.opus!=null?entry.opus:'?')+'%</td>';
-        html += '<td class="px-8 py-3 text-sm text-[#908fa0]">'+(isMe?'You':(entry.country||'?'))+'</td>';
+        html += '<td class="px-4 py-3 text-sm text-[#908fa0]">'+(isMe?'You':(entry.country||'?'))+'</td>';
         html += '</tr>';
       }
       tbody.innerHTML = html;

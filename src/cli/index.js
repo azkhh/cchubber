@@ -135,7 +135,7 @@ async function main() {
   const inflection = detectInflectionPoints(dailyFromJSONL);
   const sessionIntel = analyzeSessionIntelligence(sessionMeta, jsonlEntries);
   const modelRouting = analyzeModelRouting(costAnalysis, jsonlEntries);
-  const valueTrend = analyzeValueTrend(dailyFromJSONL);
+  const valueTrend = analyzeValueTrend(dailyFromJSONL, costAnalysis.dailyCosts, inflection?.date);
   if (valueTrend.available) console.log(`  ✓ Value trend: ${valueTrend.avgOutputPerMsg} tokens/msg avg (${valueTrend.trend})`);
 
   const recommendations = generateRecommendations(costAnalysis, cacheHealth, claudeMdStack, anomalies, inflection, sessionIntel, modelRouting, projectBreakdown);
