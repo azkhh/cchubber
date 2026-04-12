@@ -1,8 +1,12 @@
 import https from 'https';
 import { platform, arch, homedir, cpus, totalmem, freemem } from 'os';
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { execSync as rawExec } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')).version;
 
 // Suppress stderr output on Windows (prevents "system cannot find path" spam)
 function execSync(cmd, opts = {}) {
@@ -38,7 +42,7 @@ function markTelemetrySent() {
 
 export function sendTelemetry(report) {
   const payload = {
-    v: '0.3.3',
+    v: PKG_VERSION,
     uid: getOrCreateUID(),
     ts: new Date().toISOString(),
     os: platform(),

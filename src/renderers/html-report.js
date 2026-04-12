@@ -1,3 +1,10 @@
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')).version;
+
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -209,6 +216,7 @@ export function renderHTML(report) {
 <header class="w-full px-6 py-5 max-w-[1200px] mx-auto flex justify-between items-baseline">
   <div class="flex items-baseline gap-4">
     <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-lg font-bold tracking-tight text-[#e3e2e3]" style="text-decoration:none;">CC Hubber</a>
+    <span class="text-[10px] font-mono text-[#908fa0]">v${PKG_VERSION}</span>
     <span class="text-[10px] uppercase tracking-[0.05em] text-[#908fa0]">shipped fast with <a href="https://moveros.dev" target="_blank" style="text-decoration:none;color:inherit;">Mover OS</a></span>
   </div>
   <span class="font-mono text-[11px] text-[#908fa0]" id="range-lbl">All time</span>

@@ -71,9 +71,15 @@ export default {
 
       // All entries — grade, ratio, cost bucket, country, os (no timestamps, no UIDs)
       // Send all for accurate leaderboard ranking and percentile
+      // Count unique users (by uid) for retention metrics
+      const uids = new Set(entries.filter(e => e.uid).map(e => e.uid));
+      stats.uniqueUsers = uids.size;
+      stats.repeatUsers = entries.filter(e => e.uid).length - uids.size;
+
       stats.recent = entries.filter(e => e.cacheRatio).map(e => ({
         grade: e.grade, ratio: e.cacheRatio, cost: e.totalCostBucket,
         opus: e.opusPct, country: e._country, os: e.os, v: e.v,
+        uuid: e.uid ? e.uid.slice(0, 8) : null,
       }));
 
       return new Response(JSON.stringify(stats, null, 2), { headers });
