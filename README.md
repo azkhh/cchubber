@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/azkhh-cchubber-badge.png)](https://mseep.ai/app/azkhh-cchubber)
+
 # CC Hubber
 
 [![npm downloads](https://img.shields.io/npm/dt/cchubber?color=c0c1ff&label=installs)](https://www.npmjs.com/package/cchubber)
