@@ -8,22 +8,19 @@ import { homedir } from 'os';
  * Claude Code stores full conversation transcripts with token usage per message.
  */
 export function readAllJSONL(claudeDir) {
-  const projectsDir = join(claudeDir, 'projects');
-  const xdgDir = join(homedir(), '.config', 'claude', 'projects'); // XDG fallback for Linux
-
   const entries = [];
-
-  // Read from primary location
-  if (existsSync(projectsDir)) {
-    readProjectsDir(projectsDir, entries);
-  }
-
-  // XDG fallback (Linux with newer Claude Code)
-  if (existsSync(xdgDir) && xdgDir !== projectsDir) {
-    readProjectsDir(xdgDir, entries);
-  }
-
+  for (const dir of projectRoots(claudeDir)) readProjectsDir(dir, entries);
   return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
+/**
+ * Where Claude Code keeps its transcripts: ~/.claude/projects, plus the XDG path newer Linux builds use.
+ * Shared with the drift reader so both read the same sessions.
+ */
+export function projectRoots(claudeDir) {
+  const projectsDir = join(claudeDir, 'projects');
+  const xdgDir = join(homedir(), '.config', 'claude', 'projects');
+  return [projectsDir, xdgDir].filter((d, i, all) => all.indexOf(d) === i && existsSync(d));
 }
 
 function readProjectsDir(dir, entries) {

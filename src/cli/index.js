@@ -30,6 +30,8 @@ import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
 import { renderS1 } from '../renderers/s1-report.js';
 import { readPlan } from '../readers/plan.js';
+import { runDrift } from '../analyzers/drift-run.js';
+import { renderDrift } from '../renderers/drift-report.js';
 import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
 import { saveRun, getDelta, getHistory } from '../history.js';
 
@@ -40,6 +42,8 @@ const flags = {
   noTelemetry: args.includes('--no-telemetry'),
   noOpen: args.includes('--no-open'),
   s1: args.includes('--s1'),
+  drift: args.includes('--drift'),
+  redact: args.includes('--redact'),
   showProject: args.includes('--show-project'),
   name: (() => { const i = args.indexOf('--name'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
   plan: (() => { const i = args.indexOf('--plan'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
@@ -73,6 +77,8 @@ if (flags.help) {
     --name <name>      Company name on the S-1 (default: You)
     --plan <usd>       Monthly plan price, if it can't be detected
     --show-project     Name your top project on the S-1
+    --drift            Your week vs what you said you'd do (a shareable card)
+    --redact           On --drift, replace detour names with categories
     -h, --help         Show this help
 
   Examples:
@@ -80,6 +86,8 @@ if (flags.help) {
     cchubber --days 7           Last 7 days only
     cchubber -o report.html     Custom output path
     cchubber --json             Machine-readable output
+    cchubber --drift            How much of your week went to the plan
+    cchubber --drift --redact   Same, with detour names hidden
 
   Shipped with Mover OS at speed.
   https://moveros.dev
@@ -95,6 +103,9 @@ async function main() {
     console.error('    Make sure Claude Code is installed and has been used at least once.\n');
     process.exit(1);
   }
+
+  // Drift report: its own local pipeline (last week of sessions vs your stated plan). No cost reading, no network.
+  if (flags.drift) return driftMode(claudeDir);
 
   console.log(`
     /\\  _  /\\
@@ -239,6 +250,47 @@ async function main() {
 function getClaudeDir() {
   const home = homedir();
   return join(home, '.claude');
+}
+
+async function driftMode(claudeDir) {
+  const days = flags.days === 30 ? 7 : flags.days; // 7-day week by default; --days overrides
+  // Progress goes to stderr so `--drift --json` emits clean JSON on stdout
+  const log = flags.json ? (m) => process.stderr.write(m + '\n') : (m) => console.log(m);
+
+  log(`
+    /\\  _  /\\
+   /  \\(_)/  \\   CC Hubber v${VERSION} — Drift Report
+   \\  / ~ \\  /   How much of your week went to what you said you'd do.
+    \\/  ·  \\/
+  `);
+  log(`  Reading the last ${days} days of local sessions...\n`);
+
+  const drift = runDrift(claudeDir, { days });
+
+  if (!drift.available) {
+    console.error('  ✗ No agent work found in the window. Use Claude Code (or Codex) this week, then try again.\n');
+    process.exit(1);
+  }
+
+  const pct = Math.round(drift.share * 100);
+  log(`  ✓ ${drift.totals.prompts} prompts across ${drift.totals.sessions} sessions (${drift.inputs.claude} Claude${drift.inputs.codex ? `, ${drift.inputs.codex} Codex` : ''})`);
+  log(`  ✓ What you said you'd do: ${drift.source.planNames.length ? drift.source.planNames.join(' + ') : 'your first ask of each session'}`);
+  if (!drift.inputs.codexPresent) log('  ○ No Codex sessions found (skipped)');
+  log(`\n  ${pct}% of your agent time went to what you said you'd do.`);
+  log(`  ${Math.round(drift.totals.onMs / 3600000)}h on plan · ${Math.round(drift.totals.detourMs / 3600000)}h on detours\n`);
+  for (const d of drift.detours.slice(0, 5)) {
+    const label = flags.redact ? d.category : (d.name || d.category);
+    log(`    · ${label}  ${Math.max(1, Math.round(d.ms / 60000))}m`);
+  }
+  log('');
+
+  if (flags.json) { process.stdout.write(JSON.stringify(drift, null, 2) + '\n'); return; }
+
+  const outPath = flags.output || join(process.cwd(), 'cchubber-drift.html');
+  writeFileSync(outPath, renderDrift(drift, { redact: flags.redact }), 'utf-8');
+  log(`  ✓ Card saved to: ${outPath}`);
+  log('  ○ It stayed on this machine. Nothing was uploaded.' + (flags.redact ? '' : ' Use --redact to hide detour names.'));
+  if (!flags.noOpen) { openInBrowser(outPath); log('  ✓ Opened in browser\n'); }
 }
 
 function openInBrowser(filePath) {

@@ -10,3 +10,4 @@ docs/
 worker/.wrangler/
 worker/wrangler.toml
 cchubber-s1.html
+cchubber-drift.html
