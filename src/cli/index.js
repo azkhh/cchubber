@@ -28,6 +28,8 @@ import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { analyzeValueTrend } from '../analyzers/value-tracker.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal } from '../renderers/terminal-summary.js';
+import { renderS1 } from '../renderers/s1-report.js';
+import { readPlan } from '../readers/plan.js';
 import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
 import { saveRun, getDelta, getHistory } from '../history.js';
 
@@ -37,6 +39,10 @@ const flags = {
   json: args.includes('--json'),
   noTelemetry: args.includes('--no-telemetry'),
   noOpen: args.includes('--no-open'),
+  s1: args.includes('--s1'),
+  showProject: args.includes('--show-project'),
+  name: (() => { const i = args.indexOf('--name'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
+  plan: (() => { const i = args.indexOf('--plan'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
   output: (() => {
     const idx = args.indexOf('--output') !== -1 ? args.indexOf('--output') : args.indexOf('-o');
     return idx !== -1 && args[idx + 1] ? args[idx + 1] : null;
@@ -63,6 +69,10 @@ if (flags.help) {
     --output, -o <path> Output HTML report to custom path
     --no-open          Don't auto-open the report in browser
     --json             Output raw analysis as JSON
+    --s1               Your usage as an IPO prospectus (parody)
+    --name <name>      Company name on the S-1 (default: You)
+    --plan <usd>       Monthly plan price, if it can't be detected
+    --show-project     Name your top project on the S-1
     -h, --help         Show this help
 
   Examples:
@@ -203,6 +213,16 @@ async function main() {
     console.log('  ○ Sharing anonymous stats...');
     await sendTelemetry(report);
     console.log('  ✓ Stats shared (opt out: --no-telemetry)');
+  }
+
+  if (flags.s1) {
+    const plan = readPlan(flags.plan);
+    const s1Path = flags.output || join(process.cwd(), 'cchubber-s1.html');
+    writeFileSync(s1Path, renderS1(report, { plan, name: flags.name, showProject: flags.showProject }), 'utf-8');
+    console.log(`\n  ✓ Your S-1 saved to: ${s1Path}`);
+    if (!plan) console.log('  ○ Plan not detected. Add --plan 100 (or 20, 200) to show what you paid.');
+    if (!flags.noOpen) { openInBrowser(s1Path); console.log('  ✓ Opened in browser\n'); }
+    return;
   }
 
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
