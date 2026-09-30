@@ -33,7 +33,8 @@ import { renderS1 } from '../renderers/s1-report.js';
 import { readPlan, monthsBilled } from '../readers/plan.js';
 import { runDrift } from '../analyzers/drift-run.js';
 import { renderDrift } from '../renderers/drift-report.js';
-import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
+import { shouldSendTelemetry, sendTelemetry, beaconConfig } from '../telemetry.js';
+import { spentWellLine } from '../renderers/spent-well.js';
 import { saveRun, getDelta, getHistory } from '../history.js';
 
 const args = process.argv.slice(2);
@@ -248,6 +249,9 @@ async function main() {
   // One line on what the same tokens would cost elsewhere; the rest is in the report.
   try { const line = vsOneLiner(vsData); if (line) console.log(`\n  ${line}`); } catch {}
 
+  // The report's "Did you spend them well?" strip, pointed at from the terminal.
+  try { const line = spentWellLine(report); if (line) console.log(`\n  ${line}`); } catch {}
+
   // Anonymous telemetry (opt out: --no-telemetry or CC_HUBBER_TELEMETRY=0)
   if (shouldSendTelemetry(flags)) {
     console.log('  ○ Sharing anonymous stats...');
@@ -267,7 +271,7 @@ async function main() {
 
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
   const vsCtx = vsData ? vsContext(claudeDir, vsData) : null;
-  const html = renderHTML(report, { vs: vsCtx });
+  const html = renderHTML(report, { vs: vsCtx, telemetry: beaconConfig(flags) });
   writeFileSync(outputPath, html, 'utf-8');
   console.log(`\n  ✓ Report saved to: ${outputPath}`);
 
@@ -282,7 +286,7 @@ async function main() {
 function vsContext(claudeDir, rp) {
   const plan = readPlan(flags.plan);
   const dates = rp.dailyCum.dates;
-  const months = dates.length ? monthsBilled(dates[0], dates[dates.length - 1]) : 1;
+  const months = dates.length ? monthsBilled(dates[0], dates[dates.length - 1], plan?.since) : 1;
   let driftPct = null;
   try {
     const t0 = Date.now();

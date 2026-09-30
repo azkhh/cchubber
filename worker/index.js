@@ -2,6 +2,9 @@
 // Receives anonymous usage stats, stores in KV
 // Deploy: cd worker && npx wrangler deploy
 
+// The report's three button counts. Anything else with an "event" field is refused.
+const EVENTS = ['spent_well_open', 'spent_well_copy', 'spent_well_mover'];
+
 export default {
   async fetch(request, env) {
     // CORS headers
@@ -20,6 +23,24 @@ export default {
     if (request.method === 'POST' && new URL(request.url).pathname === '/collect') {
       try {
         const data = await request.json();
+
+        // A click count from the report ("Did you spend them well?"), not a usage report. Stored under its own key prefix so
+        // the stats endpoints below (which read only t_ keys) are not inflated by it. Only known event names, only three fields.
+        if (data && typeof data === 'object' && 'event' in data) {
+          if (!EVENTS.includes(data.event)) {
+            return new Response(JSON.stringify({ ok: false, error: 'unknown event' }), { status: 400, headers });
+          }
+          const ekey = `e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const evt = {
+            event: data.event,
+            v: String(data.v || '').slice(0, 20),
+            uid: String(data.uid || '').slice(0, 40),
+            _received: new Date().toISOString(),
+            _country: request.cf?.country || 'unknown',
+          };
+          await env.TELEMETRY.put(ekey, JSON.stringify(evt), { expirationTtl: 60 * 60 * 24 * 90 });
+          return new Response(JSON.stringify({ ok: true }), { headers });
+        }
 
         // Generate unique key with timestamp
         const key = `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -42,7 +63,7 @@ export default {
 
     // GET /stats-public — aggregate summary for leaderboard (no key, limited data)
     if (request.method === 'GET' && new URL(request.url).pathname === '/stats-public') {
-      const list = await env.TELEMETRY.list({ limit: 1000 });
+      const list = await env.TELEMETRY.list({ prefix: 't_', limit: 1000 });
       const entries = [];
       for (const key of list.keys) {
         const val = await env.TELEMETRY.get(key.name);
@@ -94,7 +115,7 @@ export default {
       }
 
       // List all telemetry entries
-      const list = await env.TELEMETRY.list({ limit: 1000 });
+      const list = await env.TELEMETRY.list({ prefix: 't_', limit: 1000 });
       const entries = [];
       for (const key of list.keys) {
         const val = await env.TELEMETRY.get(key.name);
@@ -162,7 +183,7 @@ export default {
         return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers });
       }
 
-      const list = await env.TELEMETRY.list({ limit: 1000 });
+      const list = await env.TELEMETRY.list({ prefix: 't_', limit: 1000 });
       const entries = [];
       for (const key of list.keys) {
         const val = await env.TELEMETRY.get(key.name);
@@ -172,6 +193,28 @@ export default {
       return new Response(JSON.stringify(entries, null, 2), { headers });
     }
 
-    return new Response(JSON.stringify({ service: 'cchubber-telemetry', endpoints: ['/collect', '/stats?key=', '/dump?key='] }), { headers });
+    // GET /events — the report's button counts (password protected): per event, total clicks and distinct anonymous ids
+    if (request.method === 'GET' && new URL(request.url).pathname === '/events') {
+      const pass = new URL(request.url).searchParams.get('key');
+      if (pass !== env.STATS_KEY) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers });
+      }
+      const list = await env.TELEMETRY.list({ prefix: 'e_', limit: 1000 });
+      const out = {};
+      const ids = {};
+      for (const key of list.keys) {
+        const val = await env.TELEMETRY.get(key.name);
+        if (!val) continue;
+        const e = JSON.parse(val);
+        out[e.event] = out[e.event] || { clicks: 0, uniqueIds: 0 };
+        out[e.event].clicks++;
+        ids[e.event] = ids[e.event] || new Set();
+        if (e.uid) ids[e.event].add(e.uid);
+      }
+      for (const name of Object.keys(out)) out[name].uniqueIds = ids[name].size;
+      return new Response(JSON.stringify(out, null, 2), { headers });
+    }
+
+    return new Response(JSON.stringify({ service: 'cchubber-telemetry', endpoints: ['/collect', '/stats?key=', '/dump?key=', '/events?key='] }), { headers });
   },
 };

@@ -19,10 +19,22 @@ function execSync(cmd, opts = {}) {
 
 const TELEMETRY_URL = process.env.CC_HUBBER_TELEMETRY_URL || 'https://cchubber-telemetry.asmirkhan087.workers.dev/collect';
 
-export function shouldSendTelemetry(flags) {
+// The opt-outs only. The 24-hour throttle below limits the automatic stats send, not whether the user agreed to telemetry.
+export function telemetryEnabled(flags = {}) {
   if (flags.noTelemetry) return false;
   if (process.env.CC_HUBBER_TELEMETRY === '0') return false;
   if (process.env.DO_NOT_TRACK === '1') return false;
+  return true;
+}
+
+/** What the report needs to send its three button counts: { on: false }, or the address, the anonymous id and the version. */
+export function beaconConfig(flags = {}) {
+  if (!telemetryEnabled(flags)) return { on: false };
+  return { on: true, url: TELEMETRY_URL, uid: getOrCreateUID(), v: PKG_VERSION };
+}
+
+export function shouldSendTelemetry(flags) {
+  if (!telemetryEnabled(flags)) return false;
 
   // Throttle: once per 24 hours per machine
   const stampFile = join(homedir(), '.cchubber-last-telemetry');

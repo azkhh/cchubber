@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { renderVsBlock } from './vs-report.js';
+import { renderSpentWell } from './spent-well.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')).version;
@@ -36,6 +37,9 @@ export function renderHTML(report, opts = {}) {
 
   // "Your usage on other models": the race, the facts and the card buttons, right under the grade card.
   const vsBlock = report.reprice && report.reprice.models && report.reprice.models.length ? renderVsBlock(report.reprice, opts.vs || {}) : '';
+
+  // "You burnt N tokens. Did you spend them well?": the strip between the grade card and the race.
+  const swBlock = renderSpentWell(report, opts.telemetry || { on: false });
 
   const fmtCost = (n) => '$' + (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(2));
   const fmtDuration = (m) => m >= 120 ? Math.round(m/60) + 'h' : m >= 60 ? (m/60).toFixed(1) + 'h' : m + 'm';
@@ -256,6 +260,16 @@ export function renderHTML(report, opts = {}) {
     }
     .cc-inner{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;min-height:280px;}
     .cc-card.no-shimmer::before{display:none!important;}
+    /* Phone: the three stats stack and wrap instead of running into each other, and the footer wraps. Desktop is untouched. */
+    @media (max-width:640px){
+      .cc-card .cc-inner{padding:24px 20px;gap:22px}
+      .cc-card .cc-stats{flex-wrap:wrap;justify-content:flex-start;align-items:flex-end;gap:18px 32px}
+      .cc-card .cc-stats > div{text-align:left;min-width:0}
+      .cc-card .cc-stats > div:first-child{flex:1 0 100%}
+      .cc-card .cc-stats p.font-mono{font-size:32px;overflow-wrap:anywhere}
+      .cc-card .cc-foot{flex-direction:column;align-items:flex-start;gap:12px}
+      .cc-card .cc-foot > div{flex-wrap:wrap}
+    }
   </style>
   <div class="cc-card" id="share-card-html">
     <div class="cc-inner">
@@ -274,7 +288,7 @@ export function renderHTML(report, opts = {}) {
           <span class="text-[11px] font-mono uppercase tracking-[0.06em] text-[#596678] block" id="card-range">All time</span>
         </div>
       </div>
-      <div class="flex justify-between items-end">
+      <div class="flex justify-between items-end cc-stats">
         <div>
           <p class="text-[10px] uppercase tracking-[0.06em] text-[#908fa0] mb-1">Total Spend</p>
           <p class="font-mono text-[40px] font-bold text-[#e3e2e3] leading-none" id="h-cost">${fmtCost(totalCost)}</p>
@@ -288,7 +302,7 @@ export function renderHTML(report, opts = {}) {
           <p class="font-mono text-[40px] font-bold text-[#e3e2e3] leading-none">${cacheHealth.efficiencyRatio ? cacheHealth.efficiencyRatio.toLocaleString() + ':1' : 'N/A'}</p>
         </div>
       </div>
-      <div class="flex justify-between items-end">
+      <div class="flex justify-between items-end cc-foot">
         <p class="text-[12px] text-[#908fa0]">${diagnosisLine}</p>
         <div class="flex items-center gap-2 text-[12px] font-mono tracking-[0.03em] shrink-0">
           <a href="https://github.com/azkhh/cchubber" target="_blank" class="text-[#c0c1ff] hover:text-[#e1e0ff]" style="text-decoration:none;font-weight:600;">CC Hubber</a>
@@ -309,6 +323,7 @@ export function renderHTML(report, opts = {}) {
   </div>
 </section>
 
+${swBlock}
 ${vsBlock}
 
 ${inflection && inflection.multiplier >= 1.5 ? `

@@ -60,13 +60,41 @@ export function cacheLine(rp) {
   return lo === hi ? `Cache reads and writes are ${lo}% of every bill above.` : `Cache reads and writes are ${lo}% to ${hi}% of every bill above.`;
 }
 
-/** { paid, text } or null when no plan was detected. `months` comes from monthsBilled over the logged window. */
+// The plan cost is an estimate, never a reading of the user's invoices: the plan's US list price times the months billed.
+export const PAID_FINE_PRINT = "The plan cost is an estimate: the plan's US list price (or the price you gave) before tax, times the months billed. Tax, currency, upgrades and billing dates change what you really paid. Type what you actually paid to replace it.";
+
+// Templates the page script fills when the user types what they actually paid. {amt} and {x} are swapped for figures.
+export const PAID_ACTUAL_TEXT = 'You paid {amt}.';
+export const PAID_ACTUAL_POST = 'I paid {amt}.';
+export const PAID_ACTUAL_CAPTION = 'what I paid';
+
+/** { paid, estimate: true, text, post, caption } or null when no plan was detected. `months` comes from monthsBilled. */
 export function paidFacts(plan, months) {
   if (!plan) return null;
   const paid = plan.monthlyUSD * months;
   const span = `${months} month${months === 1 ? '' : 's'}`;
-  const detail = plan.key === 'custom' ? `${span} at ${usd0(plan.monthlyUSD)}` : `${plan.name}, ${span}`;
-  return { paid, text: `You paid about ${usd0(paid)} (${detail}).` };
+  const isList = plan.key !== 'custom';
+  const detail = isList ? `${plan.name} at the US list price of ${usd0(plan.monthlyUSD)} a month, ${span}` : `${span} at ${usd0(plan.monthlyUSD)} a month, the price you gave`;
+  return {
+    paid,
+    estimate: true,
+    text: `Estimated plan cost: about ${usd0(paid)} (${detail}).`,
+    post: isList ? `Plan cost, estimated at US list price: ${usd0(paid)}.` : `Plan cost, estimated: ${usd0(paid)}.`,
+    caption: isList ? 'estimated plan cost at US list price' : 'estimated plan cost',
+  };
+}
+
+// 15 for 14.6, 3.5 for 3.46: one decimal only while it still says something.
+export const timesLabel = (r) => (r >= 10 ? String(Math.round(r)) : r.toFixed(1).replace(/\.0$/, ''));
+
+/** What you ran (Claude list prices) against the paid figure. `template` holds {x} for the page script. Null without both numbers. */
+export function multipleFacts(ran, paid, estimate, x = null) {
+  if (!(ran > 0) || !(paid > 0)) return null;
+  const n = x ?? timesLabel(ran / paid);
+  const text = estimate
+    ? `What you ran, at Claude list prices, is about ${n} times that estimate.`
+    : `What you ran, at Claude list prices, is ${n} times what you paid.`;
+  return { times: ran / paid, text };
 }
 
 export function overrideRows(rp) {
@@ -95,20 +123,27 @@ export function filledNotes(rp) {
 
 export const SHARE_CMD = 'npx cchubber';
 
-/** The text for Copy text and Post on X: one text, kept inside 280 characters by adding lines only while they fit. */
-export function postText(rp, { plan = null, months = 1, driftPct = null } = {}) {
-  const lo = low(rp), hi = high(rp);
-  const head = `My Claude Code tokens, repriced on ${rp.models.length} frontier models: ${usd0(lo.total)} (${lo.label}) to ${usd0(hi.total)} (${hi.label}).`;
-  const optional = [
-    readLine(rp),
-    paidFacts(plan, months)?.text.replace(/^You paid/, 'I paid'),
-    driftPct != null ? `${driftPct}% of my last week went to what I said I'd do.` : null,
-  ].filter(Boolean);
+/** Greedy fit: add optional lines while the whole post (plus the command) stays inside 280 characters. The page script repeats this. */
+export function assemblePost(head, optional) {
   let body = head;
-  for (const line of optional) {
+  for (const line of optional.filter(Boolean)) {
     const next = `${body} ${line}`;
     if ((next + '\n\n' + SHARE_CMD).length <= 280) body = next;
   }
   if ((body + '\n\n' + SHARE_CMD).length > 280) body = head;
   return `${body}\n\n${SHARE_CMD}`;
+}
+
+export function postHead(rp) {
+  const lo = low(rp), hi = high(rp);
+  return `My Claude Code tokens, repriced on ${rp.models.length} frontier models: ${usd0(lo.total)} (${lo.label}) to ${usd0(hi.total)} (${hi.label}).`;
+}
+
+export function driftPost(driftPct) {
+  return driftPct != null ? `${driftPct}% of my last week went to what I said I'd do.` : null;
+}
+
+/** The text for Copy text and Post on X: one text, kept inside 280 characters by adding lines only while they fit. */
+export function postText(rp, { plan = null, months = 1, driftPct = null } = {}) {
+  return assemblePost(postHead(rp), [readLine(rp), paidFacts(plan, months)?.post, driftPost(driftPct)]);
 }
