@@ -378,16 +378,8 @@ function summarize({ turns, human, detours, since, until, idf, sources, planName
   }
   for (const e of episodes) e.best = e.turns.reduce((a, b) => (b.richness > a.richness ? b : a), e.turns[0]);
 
-  // The longest single episode is the day's deepest rabbit hole
+  // The longest single episode is the day's deepest rabbit hole (named below, from the detour row it belongs to)
   const longest = episodes.slice().sort((a, b) => b.ms - a.ms)[0] || null;
-  const streak = longest ? {
-    ms: longest.ms,
-    wallMs: longest.end - longest.start,
-    start: longest.start,
-    detours: longest.turns.filter(t => t.thread && t.thread.head === t).length,
-    name: labelName(longest.best.text, touchedBy(longest.turns), categorize(longest.turns.map(t => t.text).join(' '))),
-    category: categorize(longest.turns.map(t => t.text).join(' ')),
-  } : null;
 
   // Episodes on the same subject across the week are one named detour, counted each time it pulled you away
   const clusters = [];
@@ -407,19 +399,38 @@ function summarize({ turns, human, detours, since, until, idf, sources, planName
   const mergeSame = (list) => {
     const by = new Map();
     for (const d of list) {
-      const k = d.name;
+      const k = `${d.name}|${d.category}`;
       const c = by.get(k);
       if (c) { c.ms += d.ms; c.times += d.times; c.first = Math.min(c.first, d.first); } else by.set(k, { ...d });
     }
     return [...by.values()];
   };
-  const named = mergeSame(clusters.map(c => ({
-    name: labelName(c.best.text, touchedBy(c.episodes.flatMap(e => e.turns)), categorize(c.episodes.map(e => e.best.text).join(' '))),
-    category: categorize(c.episodes.map(e => e.best.text).join(' ')),
-    ms: c.ms,
-    times: c.episodes.length,
-    first: Math.min(...c.episodes.map(e => e.start)),
-  })).filter(d => d.name)).sort((a, b) => b.ms - a.ms);
+  // One name and one category per detour, decided once here. The list and the rabbit-hole card both read them, so they cannot disagree.
+  const rowOf = (c) => {
+    const category = categorize(c.episodes.map(e => e.best.text).join(' '));
+    return {
+      name: labelName(c.best.text, touchedBy(c.episodes.flatMap(e => e.turns)), category),
+      category,
+      ms: c.ms,
+      times: c.episodes.length,
+      first: Math.min(...c.episodes.map(e => e.start)),
+    };
+  };
+  const named = mergeSame(clusters.map(rowOf).filter(d => d.name)).sort((a, b) => b.ms - a.ms);
+
+  // The rabbit hole is the longest episode, labelled as the detour it belongs to. An episode that joined no cluster (no
+  // readable words) falls back to labelling itself.
+  const home = longest ? clusters.find(c => c.episodes.includes(longest)) : null;
+  const homeRow = home ? rowOf(home) : null;
+  const ownCategory = longest ? categorize(longest.turns.map(t => t.text).join(' ')) : null;
+  const streak = longest ? {
+    ms: longest.ms,
+    wallMs: longest.end - longest.start,
+    start: longest.start,
+    detours: longest.turns.filter(t => t.thread && t.thread.head === t).length,
+    name: homeRow ? homeRow.name : labelName(longest.best.text, touchedBy(longest.turns), ownCategory),
+    category: homeRow ? homeRow.category : ownCategory,
+  } : null;
 
   const active = new Set(counted.map(t => t.session));
   const inSpan = human.filter(t => t.t >= since && t.t <= until);

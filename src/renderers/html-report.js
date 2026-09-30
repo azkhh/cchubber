@@ -271,6 +271,7 @@ export function renderHTML(report, opts = {}) {
       .cc-card .cc-stats > div{text-align:left;min-width:0}
       .cc-card .cc-stats > div:first-child{flex:1 0 100%}
       .cc-card .cc-stats p.font-mono{font-size:32px;overflow-wrap:anywhere}
+      .cc-card .cc-meta{white-space:nowrap;flex-shrink:0;margin-left:12px}
       .cc-card .cc-foot{flex-direction:column;align-items:flex-start;gap:12px}
       .cc-card .cc-foot > div{flex-wrap:wrap}
     }
@@ -287,7 +288,7 @@ export function renderHTML(report, opts = {}) {
             <span class="text-xl font-bold text-[#e3e2e3]">${gradeLabel}</span>
           </div>
         </div>
-        <div class="text-right">
+        <div class="text-right cc-meta">
           <span class="text-[11px] font-mono uppercase tracking-[0.1em] text-[#908fa0] font-bold block">Claude Code</span>
           <span class="text-[11px] font-mono uppercase tracking-[0.06em] text-[#596678] block" id="card-range">All time</span>
         </div>

@@ -151,7 +151,7 @@ function cardHtml(drift, { redact }) {
   const byKind = mergeByCategory(drift.detours).slice(0, 5).map(d => ({ label: d.category, ms: d.ms, times: d.times }));
   const worst = drift.worstDay && drift.worstDay.detourMs > 0 ? drift.worstDay : null;
   const streak = drift.streak && drift.streak.ms >= 20 * MIN ? drift.streak : null;
-  const agents = [drift.inputs?.claude && 'Claude Code', drift.inputs?.codex && 'Codex'].filter(Boolean).join(' + ') || 'Claude Code';
+  const agents = [drift.agents?.claude && 'Claude Code', drift.agents?.codex && 'Codex'].filter(Boolean).join(' + ') || 'Claude Code';
 
   const rows = (list, cls) => `<ul class="rows ${cls}">${list.map((d, i) => `
       <li class="row" style="--i:${i}">
@@ -246,7 +246,8 @@ export function renderDriftSection(state, { redact = false } = {}) {
   if (ok) {
     const d = state.drift;
     const t = d.totals;
-    const agents = [d.inputs?.claude && `${d.inputs.claude} Claude Code`, d.inputs?.codex && `${d.inputs.codex} Codex`].filter(Boolean).join(', ') || 'Claude Code';
+    // The split of the same sessions the total counts (sessions that had agent time), not of every transcript that was read
+    const split = [d.agents?.claude && `${d.agents.claude} Claude Code`, d.agents?.codex && `${d.agents.codex} Codex`].filter(Boolean).join(', ');
     body = `
   <div class="dr-grid">
     ${cardHtml(d, { redact })}
@@ -257,7 +258,7 @@ export function renderDriftSection(state, { redact = false } = {}) {
       </div>
       <div>
         <h4>What was measured</h4>
-        <p><b>${esc(t.prompts)}</b> prompts across <b>${esc(t.sessions)}</b> sessions (${esc(agents)}) in the last ${days} days. Work that matched your plan counts as on plan; everything else is a detour.</p>
+        <p><b>${esc(t.prompts)}</b> prompts across <b>${esc(t.sessions)}</b> session${t.sessions === 1 ? '' : 's'}${split ? ` (${esc(split)})` : ''} in the last ${days} days. Work that matched your plan counts as on plan; everything else is a detour.</p>
       </div>
       ${dayList(d)}
       <p class="dr-small">Everything ran on this machine. Nothing was uploaded. The method is rough: it reads your words and the files touched, so it will miscall the odd one. ${redact ? 'Detour names are hidden in this file.' : 'Detour names are short labels from your own words (paths, keys and links removed) or from the folder the work touched.'}</p>
