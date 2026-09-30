@@ -32,3 +32,22 @@ export function runDrift(claudeDir, { days = 7, until = Date.now(), codexDir = d
     },
   };
 }
+
+/**
+ * Drift as the plain report needs it: never throws, and says which of four things happened so the page can be honest.
+ *   ok       a written plan was found and there was agent work: `drift` holds the analysis
+ *   no-work  nothing from Claude Code or Codex in the window
+ *   no-plan  work, but no written plan to measure it against (the first-ask fallback is not shown as a headline)
+ *   error    the pipeline failed on this machine
+ */
+export function driftForReport(claudeDir, opts = {}) {
+  const days = opts.days || 7;
+  try {
+    const drift = runDrift(claudeDir, { days });
+    if (!drift.available) return { state: 'no-work', days };
+    if (!drift.source?.planNames?.length) return { state: 'no-plan', days, drift };
+    return { state: 'ok', days, drift };
+  } catch {
+    return { state: 'error', days };
+  }
+}

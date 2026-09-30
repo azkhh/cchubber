@@ -1,10 +1,3 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')).version;
-
 function esc(s) {
   if (s === 0) return '0';
   if (!s) return '';
@@ -23,10 +16,10 @@ const hours = (ms) => {
 };
 const dateShort = (iso) => { const d = new Date(iso + 'T00:00:00'); return `${MONTH[d.getMonth()]} ${d.getDate()}`; };
 const weekday = (iso) => WEEKDAY[new Date(iso + 'T00:00:00').getDay()];
-// "Sep 22–29" when one month, "Sep 28 – Oct 4" across two
+// "Sep 22 to 29" when one month, "Sep 28 to Oct 4" across two
 function rangeLabel(a, b) {
   const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
-  return da.getMonth() === db.getMonth() ? `${MONTH[da.getMonth()]} ${da.getDate()}–${db.getDate()}` : `${dateShort(a)} – ${dateShort(b)}`;
+  return da.getMonth() === db.getMonth() ? `${MONTH[da.getMonth()]} ${da.getDate()} to ${db.getDate()}` : `${dateShort(a)} to ${dateShort(b)}`;
 }
 
 // A closing line with a bit of bite, in his register: lowercase, no wind-up, takes the reader's side against the
@@ -44,24 +37,100 @@ function kicker(share, drift) {
   return `${pct}%. the plan filed a missing person report.`;
 }
 
-/**
- * The drift card: phone-first, built to screenshot. Fully offline, no web fonts, no network.
- * `drift` is the analysis from analyzeDrift; `opts.redact` shows detour categories instead of the user's words.
- */
-export function renderDrift(drift, { redact = false } = {}) {
+// ---------------------------------------------------------------------------------------------------------------
+// The drift card as a component: one section inside the plain report, under the "Did you spend them well?" strip.
+// Every selector starts with #drift and nothing is fetched, so it cannot restyle the report around it. The card itself
+// (number, bar, detours, facts, closing line) is the same markup the standalone --drift page used to have.
+// ---------------------------------------------------------------------------------------------------------------
+const CSS = `
+#drift{
+  --card:#15161c; --card2:#191b22; --ink:#ecebf1; --dim:#9a99a8; --faint:#6a6a78;
+  --line:rgba(255,255,255,.07); --on:#7fe0b0; --off:#ffb27a; --accent:#c0c1ff;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  width:100%; max-width:1152px; margin-left:auto; margin-right:auto; color:var(--ink);
+}
+#drift .dr-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 16px}
+#drift .dr-title{margin:0; font-size:20px; line-height:1.2; font-weight:700; color:var(--ink)}
+#drift .dr-range{font-family:var(--mono); font-size:11px; color:var(--faint)}
+#drift .dr-grid{display:grid; grid-template-columns:minmax(0,390px) minmax(0,1fr); gap:28px; align-items:start}
+#drift .dr-grid > *{min-width:0}
+#drift .dr-side{display:flex; flex-direction:column; gap:22px; padding-top:6px}
+#drift .dr-side h4{margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+#drift .dr-side p{margin:0; font-size:16px; line-height:1.5; color:var(--dim)}
+#drift .dr-side p b{color:var(--ink); font-weight:700}
+#drift .dr-side .dr-small{font-size:13px; line-height:1.6; color:var(--faint)}
+#drift .dr-empty{background:var(--card); border:1px solid rgba(70,69,84,.15); border-radius:12px; padding:24px 28px; max-width:760px}
+#drift .dr-empty p{margin:0 0 12px; font-size:16px; line-height:1.55; color:var(--dim)}
+#drift .dr-empty p:last-child{margin-bottom:0}
+#drift .dr-empty p b{color:var(--ink)}
+#drift .dr-code{display:inline-block; font-family:var(--mono); font-size:13px; color:var(--accent); background:rgba(192,193,255,.08); border:1px solid rgba(192,193,255,.16); padding:3px 8px; border-radius:6px}
+
+#drift .card{
+  margin:0; background:
+    radial-gradient(120% 80% at 50% -10%, rgba(192,193,255,.10), transparent 60%),
+    linear-gradient(180deg,var(--card),var(--card2));
+  border:1px solid var(--line); border-radius:26px; padding:26px 22px 18px;
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 24px 60px -20px rgba(0,0,0,.7); position:relative; overflow:hidden;
+}
+#drift .top{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
+#drift .brand{font-size:11px; font-weight:800; letter-spacing:.22em; color:var(--accent)}
+#drift .range{font-size:11px; color:var(--faint); text-align:right; letter-spacing:.02em}
+#drift .range,#drift .cmd,#drift .num,#drift .rtime,#drift .fv{font-family:var(--mono)}
+#drift .hero{padding:22px 0 4px; text-align:center}
+#drift .big{display:flex; align-items:flex-start; justify-content:center; line-height:.9}
+#drift .num{font-size:112px; font-weight:800; letter-spacing:-.04em;
+  background:linear-gradient(180deg,#fff,#c9c8e6); -webkit-background-clip:text; background-clip:text; color:transparent; font-variant-numeric:tabular-nums}
+#drift .pctsign{font-size:40px; font-weight:800; color:var(--accent); margin-top:14px; margin-left:2px}
+#drift .cap{margin:6px 0 0; font-size:16px; color:var(--dim); line-height:1.35}
+#drift .cap strong{color:var(--ink); font-weight:700}
+#drift .split{margin:20px 2px 6px}
+#drift .bar{height:12px; border-radius:8px; background:rgba(255,178,122,.22); overflow:hidden}
+#drift .fill{display:block; height:100%; border-radius:8px 0 0 8px; background:linear-gradient(90deg,#7fe0b0,#9be8c2); box-shadow:0 0 16px rgba(127,224,176,.35)}
+#drift .legend{display:flex; justify-content:space-between; margin-top:9px; font-size:12px; color:var(--dim)}
+#drift .legend i{display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:5px; vertical-align:middle}
+#drift .sw.on{background:#7fe0b0} #drift .sw.off{background:#ffb27a}
+#drift .block{margin-top:22px}
+#drift .block h2{margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+#drift .rows{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px}
+#drift .row{display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line)}
+#drift .row:last-child{border-bottom:0}
+#drift .dot{width:6px; height:6px; border-radius:50%; background:var(--off); flex:none; box-shadow:0 0 8px rgba(255,178,122,.5)}
+#drift .rlabel{flex:1; min-width:0; font-size:14px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#drift .rtimes{color:var(--faint); font-size:11px; margin-left:6px}
+#drift .rtime{font-size:13px; color:var(--dim); flex:none; font-variant-numeric:tabular-nums}
+#drift .facts{display:flex; gap:10px; margin-top:20px}
+#drift .fact{flex:1; background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:14px; padding:12px 13px; min-width:0}
+#drift .fk{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint)}
+#drift .fv{display:block; font-size:20px; font-weight:800; margin:3px 0 1px}
+#drift .fs{display:block; min-width:0; font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#drift .kick{margin:22px 2px 0; font-size:15px; line-height:1.4; color:#e7d9c2}
+#drift .foot{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px; padding-top:14px; border-top:1px solid var(--line)}
+#drift .mover{font-size:11px; color:var(--faint); max-width:56%; line-height:1.3}
+#drift .cmd{font-size:12px; color:var(--accent); background:rgba(192,193,255,.08); border:1px solid rgba(192,193,255,.16); padding:5px 9px; border-radius:8px; white-space:nowrap}
+
+@media (max-width:900px){
+  #drift .dr-grid{grid-template-columns:minmax(0,1fr)}
+  #drift .card{width:100%; max-width:420px; margin:0 auto}
+  #drift .dr-side{padding-top:0}
+}
+@media (max-width:420px){
+  #drift .num{font-size:96px}
+  #drift .dr-empty{padding:18px 16px}
+}
+`;
+
+function cardHtml(drift, { redact }) {
   const pct = Math.round((drift.share || 0) * 100);
   const { onMs, detourMs } = drift.totals;
   const range = rangeLabel(firstDay(drift), lastDay(drift));
 
-  // Names by default; with --redact, categories, merged so one kind of detour is one row
+  // Names by default (scrubbed by drift-privacy); with --redact, categories, merged so one kind of detour is one row
   const detours = (redact ? mergeByCategory(drift.detours) : drift.detours)
     .slice(0, 5)
     .map(d => ({ label: redact ? d.category : (d.name || d.category), ms: d.ms, times: d.times }));
   const worst = drift.worstDay && drift.worstDay.detourMs > 0 ? drift.worstDay : null;
   const streak = drift.streak && drift.streak.ms >= 20 * MIN ? drift.streak : null;
-
   const agents = [drift.inputs?.claude && 'Claude Code', drift.inputs?.codex && 'Codex'].filter(Boolean).join(' + ') || 'Claude Code';
-  const sourceLine = sourceNote(drift);
 
   const detourRows = detours.map((d, i) => `
       <li class="row" style="--i:${i}">
@@ -70,7 +139,7 @@ export function renderDrift(drift, { redact = false } = {}) {
         <span class="rtime">${hours(d.ms)}</span>
       </li>`).join('');
 
-  const CARD = `
+  return `
   <article class="card" id="card" role="img" aria-label="Drift report: ${pct}% of agent time on plan">
     <header class="top">
       <span class="brand">DRIFT REPORT</span>
@@ -78,7 +147,7 @@ export function renderDrift(drift, { redact = false } = {}) {
     </header>
 
     <section class="hero">
-      <div class="big"><span class="num" id="num" data-to="${pct}">${pct}</span><span class="pctsign">%</span></div>
+      <div class="big"><span class="num" id="num">${pct}</span><span class="pctsign">%</span></div>
       <p class="cap">of your agent time went to<br><strong>what you said you&rsquo;d do</strong></p>
     </section>
 
@@ -105,127 +174,69 @@ export function renderDrift(drift, { redact = false } = {}) {
 
     <footer class="foot">
       <span class="mover">Mover OS catches the drift while it happens.</span>
-      <span class="cmd">npx cchubber --drift</span>
+      <span class="cmd">npx cchubber</span>
     </footer>
   </article>`;
+}
 
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Drift Report &middot; CC Hubber</title>
-<meta name="description" content="How much of your Claude Code week went to what you said you'd do. Runs locally, nothing leaves your machine.">
-<style>
-  :root{
-    --bg:#0e0f13; --card:#15161c; --card2:#191b22; --ink:#ecebf1; --dim:#9a99a8; --faint:#6a6a78;
-    --line:rgba(255,255,255,.07); --on:#7fe0b0; --off:#ffb27a; --accent:#c0c1ff;
-    --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 24px 60px -20px rgba(0,0,0,.7);
+// What to add so it works next run, in plain words. Never a number.
+const EMPTY = {
+  'no-plan': (d) => `
+    <p><b>No written plan found, so there is nothing to measure your last ${d} days against.</b></p>
+    <p>Write what you mean to do as a checklist in a <span class="dr-code">PLAN.md</span>, <span class="dr-code">plan.md</span> or <span class="dr-code">TODO.md</span> in the project you work in, for example <span class="dr-code">- [ ] ship the login page</span>. Run cchubber again and your week will be checked against it.</p>
+    <p>If you use Mover OS, the Focus and Tasks in your Daily Note count too.</p>`,
+  'no-work': (d) => `
+    <p><b>No Claude Code or Codex work in the last ${d} days, so there is nothing to measure.</b></p>
+    <p>Use it this week, with a checklist in a <span class="dr-code">PLAN.md</span> or <span class="dr-code">TODO.md</span> in the project, and run cchubber again.</p>`,
+  'error': (d) => `
+    <p><b>Drift could not be read on this machine this time, so no number is shown.</b></p>
+    <p>Run cchubber again. Your last ${d} days are read from your own Claude Code folder and nothing is uploaded.</p>`,
+};
+
+/**
+ * The drift section of the plain report. `state` comes from driftForReport: { state, days, drift }.
+ * `opts.redact` shows detour categories instead of the user's words (the old --drift --redact).
+ * Returns style + markup for one section (id="drift"), offline, nothing fetched.
+ */
+export function renderDriftSection(state, { redact = false } = {}) {
+  if (!state) return '';
+  const days = state.days || 7;
+  const ok = state.state === 'ok' && state.drift;
+  const range = ok ? rangeLabel(firstDay(state.drift), lastDay(state.drift)) : `last ${days} days`;
+
+  let body;
+  if (ok) {
+    const d = state.drift;
+    const t = d.totals;
+    const agents = [d.inputs?.claude && `${d.inputs.claude} Claude Code`, d.inputs?.codex && `${d.inputs.codex} Codex`].filter(Boolean).join(', ') || 'Claude Code';
+    body = `
+  <div class="dr-grid">
+    ${cardHtml(d, { redact })}
+    <div class="dr-side">
+      <div>
+        <h4>What you said you&rsquo;d do</h4>
+        <p>${esc(sourceNote(d))}</p>
+      </div>
+      <div>
+        <h4>What was measured</h4>
+        <p><b>${esc(t.prompts)}</b> prompts across <b>${esc(t.sessions)}</b> sessions (${esc(agents)}) in the last ${days} days. Work that matched your plan counts as on plan; everything else is a detour.</p>
+      </div>
+      <p class="dr-small">Everything ran on this machine. Nothing was uploaded. The method is rough: it reads your words and the files touched, so it will miscall the odd one.${redact ? '' : ' Detour names are your own words with paths, keys and links removed; run with --redact to show categories only.'}</p>
+    </div>
+  </div>`;
+  } else {
+    body = `<div class="dr-empty">${(EMPTY[state.state] || EMPTY.error)(days)}</div>`;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{
-    background:var(--bg); color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    padding:0; min-height:100dvh;
-  }
-  .page{max-width:390px; margin:0 auto; padding:18px 0 26px}
-  .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
-  .card{
-    margin:0 14px; background:
-      radial-gradient(120% 80% at 50% -10%, rgba(192,193,255,.10), transparent 60%),
-      linear-gradient(180deg,var(--card),var(--card2));
-    border:1px solid var(--line); border-radius:26px; padding:26px 22px 18px;
-    box-shadow:var(--shadow); position:relative; overflow:hidden;
-  }
-  .card::after{ /* faint grain, fixed layer, never animated */
-    content:""; position:absolute; inset:0; pointer-events:none; opacity:.03; mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  .top{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
-  .brand{font-size:11px; font-weight:800; letter-spacing:.22em; color:var(--accent)}
-  .range{font-size:11px; color:var(--faint); text-align:right; letter-spacing:.02em}
-  .range,.cmd,.num,.rtime,.fv{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
 
-  .hero{padding:22px 0 4px; text-align:center}
-  .big{display:flex; align-items:flex-start; justify-content:center; line-height:.9}
-  .num{font-size:112px; font-weight:800; letter-spacing:-.04em;
-    background:linear-gradient(180deg,#fff,#c9c8e6); -webkit-background-clip:text; background-clip:text; color:transparent;
-    font-variant-numeric:tabular-nums}
-  .pctsign{font-size:40px; font-weight:800; color:var(--accent); margin-top:14px; margin-left:2px}
-  .cap{margin:6px 0 0; font-size:16px; color:var(--dim); line-height:1.35}
-  .cap strong{color:var(--ink); font-weight:700}
-
-  .split{margin:20px 2px 6px}
-  .bar{height:12px; border-radius:8px; background:rgba(255,178,122,.22); overflow:hidden}
-  .fill{display:block; height:100%; border-radius:8px 0 0 8px;
-    background:linear-gradient(90deg,#7fe0b0,#9be8c2); box-shadow:0 0 16px rgba(127,224,176,.35);
-    transform-origin:left center}
-  .legend{display:flex; justify-content:space-between; margin-top:9px; font-size:12px; color:var(--dim)}
-  .legend i{display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:5px; vertical-align:middle}
-  .sw.on{background:#7fe0b0} .sw.off{background:#ffb27a}
-
-  .block{margin-top:22px}
-  h2{margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
-  .rows{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px}
-  .row{display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line)}
-  .row:last-child{border-bottom:0}
-  .dot{width:6px; height:6px; border-radius:50%; background:var(--off); flex:none; box-shadow:0 0 8px rgba(255,178,122,.5)}
-  .rlabel{flex:1; font-size:14px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .rtimes{color:var(--faint); font-size:11px; margin-left:6px}
-  .rtime{font-size:13px; color:var(--dim); flex:none; font-variant-numeric:tabular-nums}
-
-  .facts{display:flex; gap:10px; margin-top:20px}
-  .fact{flex:1; background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:14px; padding:12px 13px; min-width:0}
-  .fk{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint)}
-  .fv{display:block; font-size:20px; font-weight:800; margin:3px 0 1px}
-  .fs{display:block; font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-
-  .kick{margin:22px 2px 0; font-size:15px; line-height:1.4; color:#e7d9c2}
-
-  .foot{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px; padding-top:14px; border-top:1px solid var(--line)}
-  .mover{font-size:11px; color:var(--faint); max-width:56%; line-height:1.3}
-  .cmd{font-size:12px; color:var(--accent); background:rgba(192,193,255,.08); border:1px solid rgba(192,193,255,.16); padding:5px 9px; border-radius:8px; white-space:nowrap}
-
-  .note{margin:16px 16px 0; font-size:11px; line-height:1.5; color:var(--faint); text-align:center}
-  .note b{color:var(--dim); font-weight:600}
-
-  /* Motion carries the reveal: the number counts up, the bar fills, the detours slide in. All off under reduced-motion. */
-  @media (prefers-reduced-motion: no-preference){
-    .anim .fill{animation:grow .9s cubic-bezier(.22,1,.32,1) .15s both}
-    .anim .row{opacity:0; animation:slide .5s cubic-bezier(.22,1,.32,1) both; animation-delay:calc(.5s + var(--i)*.09s)}
-    .anim .hero .cap,.anim .kick,.anim .facts,.anim .foot{opacity:0; animation:rise .6s ease .25s both}
-    .anim .kick{animation-delay:.9s} .anim .facts{animation-delay:.7s} .anim .foot{animation-delay:1.1s}
-    @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-    @keyframes slide{from{opacity:0; transform:translateX(10px)}to{opacity:1; transform:none}}
-    @keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
-  }
-</style></head>
-<body>
-  <div class="page">
-  ${CARD}
-  <p class="note">${esc(sourceLine)} <b>Everything ran on this machine. Nothing was uploaded.</b> The method is rough: it reads your words and the files touched, so it will miscall the odd one.</p>
-  </div>
-<script>
-  (function(){
-    var el=document.getElementById('num'); if(!el) return;
-    var to=+el.getAttribute('data-to')||0;
-    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // #shot renders the finished card in one frame, for a clean screenshot; otherwise motion plays once
-    var shot=/shot/.test(location.hash);
-    if(!reduce&&!shot) document.body.classList.add('anim');
-    if(reduce||shot||to<=0){el.textContent=to; return;}
-    var start=null, dur=1100;
-    function tick(ts){
-      if(start===null) start=ts;
-      var p=Math.min(1,(ts-start)/dur);
-      var e=1-Math.pow(1-p,3);
-      el.textContent=Math.round(e*to);
-      if(p<1) requestAnimationFrame(tick); else el.textContent=to;
-    }
-    el.textContent='0';
-    requestAnimationFrame(tick);
-  })();
-</script>
-</body></html>`;
+  return `
+<!-- DRIFT: your last week against what you said you'd do -->
+<style>${CSS}</style>
+<section id="drift" aria-label="Your week against your plan">
+  <div class="dr-head"><h3 class="dr-title">Your week against your plan</h3><span class="dr-range">${esc(range)}</span></div>
+  ${body}
+</section>
+<script id="dr-js">(function(){ if (location.hash === '#drift') window.addEventListener('load', function(){ setTimeout(function(){ var s = document.getElementById('drift'); if (s) s.scrollIntoView(); }, 60); }); })();</script>
+`;
 }
 
 // For --redact: one row per category, times and minutes summed, biggest first

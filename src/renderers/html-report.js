@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { renderVsBlock } from './vs-report.js';
 import { renderSpentWell } from './spent-well.js';
+import { renderDriftSection } from './drift-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')).version;
@@ -40,6 +41,9 @@ export function renderHTML(report, opts = {}) {
 
   // "You burnt N tokens. Did you spend them well?": the strip between the grade card and the race.
   const swBlock = renderSpentWell(report, opts.telemetry || { on: false });
+
+  // Drift (your last week against what you wrote down), directly under that strip so the two read together.
+  const driftBlock = opts.drift ? renderDriftSection(opts.drift, { redact: !!opts.drift.redact }) : '';
 
   const fmtCost = (n) => '$' + (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(2));
   const fmtDuration = (m) => m >= 120 ? Math.round(m/60) + 'h' : m >= 60 ? (m/60).toFixed(1) + 'h' : m + 'm';
@@ -324,6 +328,7 @@ export function renderHTML(report, opts = {}) {
 </section>
 
 ${swBlock}
+${driftBlock}
 ${vsBlock}
 
 ${inflection && inflection.multiplier >= 1.5 ? `

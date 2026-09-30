@@ -32,6 +32,9 @@ A single HTML report that tells you three things: what you spent, why you spent 
 - CLAUDE.md section-by-section analysis with per-message cost impact
 - Cache break estimation even when diff files don't exist on your CC version
 
+**Your week against your plan:**
+Directly under the "Did you spend them well?" strip, the report shows how much of your last 7 days of Claude Code (and Codex) work went to what you said you'd do: one number, what it was measured against, where the rest went, and the day you drifted most. "What you said you'd do" is read from a `PLAN.md`, `plan.md` or `TODO.md` checklist in the project you work in (or a Mover OS Daily Note). With no written plan, or no work in the window, the section says what to add instead of showing a number. It runs on your machine and nothing is uploaded; detour names are your own words with paths, keys and links removed. No flag needed, it is part of `npx cchubber`.
+
 **Your usage on other models:**
 Right under the grade card, the report reprices your own tokens on every current frontier model's list price (Claude Fable 5.1, Opus 5.5, Sonnet 5.5, GPT-6 Astra and Sol, Gemini 4 Argon, DeepSeek V4 Pro, Kimi K3) and replays your real days as a six-second race. It also shows how many tokens Claude read for every token it wrote, what you paid (when your plan is detected), and, when you have a written plan, how much of your last week went to it (computed locally). Buttons download a 1200x675 card, copy the text, or open a pre-filled post on X. You click; the page never posts. No flag needed, it is part of `npx cchubber`. `--json` includes it as `reprice`.
 

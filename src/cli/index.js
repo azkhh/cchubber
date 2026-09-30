@@ -29,10 +29,8 @@ import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { analyzeValueTrend } from '../analyzers/value-tracker.js';
 import { renderHTML } from '../renderers/html-report.js';
 import { renderTerminal, vsOneLiner } from '../renderers/terminal-summary.js';
-import { renderS1 } from '../renderers/s1-report.js';
 import { readPlan, monthsBilled } from '../readers/plan.js';
-import { runDrift } from '../analyzers/drift-run.js';
-import { renderDrift } from '../renderers/drift-report.js';
+import { runDrift, driftForReport } from '../analyzers/drift-run.js';
 import { shouldSendTelemetry, sendTelemetry, beaconConfig } from '../telemetry.js';
 import { spentWellLine } from '../renderers/spent-well.js';
 import { saveRun, getDelta, getHistory } from '../history.js';
@@ -43,12 +41,9 @@ const flags = {
   json: args.includes('--json'),
   noTelemetry: args.includes('--no-telemetry'),
   noOpen: args.includes('--no-open'),
-  s1: args.includes('--s1'),
   drift: args.includes('--drift'),
   vs: args.includes('--vs'),
   redact: args.includes('--redact'),
-  showProject: args.includes('--show-project'),
-  name: (() => { const i = args.indexOf('--name'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
   plan: (() => { const i = args.indexOf('--plan'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
   output: (() => {
     const idx = args.indexOf('--output') !== -1 ? args.indexOf('--output') : args.indexOf('-o');
@@ -76,12 +71,8 @@ if (flags.help) {
     --output, -o <path> Output HTML report to custom path
     --no-open          Don't auto-open the report in browser
     --json             Output raw analysis as JSON (includes reprice: your usage on other models)
-    --s1               Your usage as an IPO prospectus (parody)
-    --name <name>      Company name on the S-1 (default: You)
     --plan <usd>       Monthly plan price, if it can't be detected
-    --show-project     Name your top project on the S-1
-    --drift            Your week vs what you said you'd do (a shareable card)
-    --redact           On --drift, replace detour names with categories
+    --redact           Show drift detours as categories instead of your own words
     -h, --help         Show this help
 
   Examples:
@@ -89,8 +80,12 @@ if (flags.help) {
     cchubber --days 7           Last 7 days only
     cchubber -o report.html     Custom output path
     cchubber --json             Machine-readable output
-    cchubber --drift            How much of your week went to the plan
-    cchubber --drift --redact   Same, with detour names hidden
+    cchubber --redact           Same report, drift detours as categories only
+
+  Nothing here needs a flag. The report that cchubber opens has a section for
+  how much of your last week went to what you said you'd do (read from a
+  PLAN.md, plan.md or TODO.md, computed locally), and one for
+  your usage on other models.
 
   Your usage on other models needs no flag. The report that cchubber opens has
   a section for it: your own tokens repriced on each frontier model's list
@@ -122,8 +117,9 @@ async function main() {
   // run that opens the report scrolled to its "Your usage on other models" section. Nothing needs the flag.
   if (flags.vs && flags.json) return vsJsonMode(claudeDir);
 
-  // Drift report: its own local pipeline (last week of sessions vs your stated plan). No cost reading, no network.
-  if (flags.drift) return driftMode(claudeDir);
+  // Hidden, for scripts: `--drift --json` prints only the drift analysis. Plain `--drift` is an alias of the normal run
+  // that opens the report scrolled to its drift section. Nothing needs the flag.
+  if (flags.drift && flags.json) return driftJsonMode(claudeDir);
 
   console.log(`
     /\\  _  /\\
@@ -259,42 +255,36 @@ async function main() {
     console.log('  ✓ Stats shared (opt out: --no-telemetry)');
   }
 
-  if (flags.s1) {
-    const plan = readPlan(flags.plan);
-    const s1Path = flags.output || join(process.cwd(), 'cchubber-s1.html');
-    writeFileSync(s1Path, renderS1(report, { plan, name: flags.name, showProject: flags.showProject }), 'utf-8');
-    console.log(`\n  ✓ Your S-1 saved to: ${s1Path}`);
-    if (!plan) console.log('  ○ Plan not detected. Add --plan 100 (or 20, 200) to show what you paid.');
-    if (!flags.noOpen) { openInBrowser(s1Path); console.log('  ✓ Opened in browser\n'); }
-    return;
-  }
-
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
-  const vsCtx = vsData ? vsContext(claudeDir, vsData) : null;
-  const html = renderHTML(report, { vs: vsCtx, telemetry: beaconConfig(flags) });
+  // Drift is part of the plain report: the last week against what you wrote down, computed locally (about 2 seconds).
+  const drift = driftForReport(claudeDir, { days: flags.days === 30 ? 7 : flags.days });
+  console.log(driftLine(drift));
+  const vsCtx = vsData ? vsContext(vsData, drift) : null;
+  const html = renderHTML(report, { vs: vsCtx, drift: { ...drift, redact: flags.redact }, telemetry: beaconConfig(flags) });
   writeFileSync(outputPath, html, 'utf-8');
   console.log(`\n  ✓ Report saved to: ${outputPath}`);
 
   if (!flags.noOpen) {
-    openInBrowser(outputPath, flags.vs ? 'vs' : '');
+    openInBrowser(outputPath, flags.drift ? 'drift' : flags.vs ? 'vs' : '');
     console.log('  ✓ Opened in browser\n');
   }
 }
 
+// The terminal line for drift, honest about why there is no number when there is none.
+function driftLine(d) {
+  if (d.state === 'ok') return `  ✓ Drift: ${Math.round(d.drift.share * 100)}% of your last ${d.days} days went to what you said you'd do. It's in your report.`;
+  if (d.state === 'no-plan') return '  ○ Drift: no written plan found. Add a PLAN.md or TODO.md with a checklist to see it in your report.';
+  if (d.state === 'no-work') return `  ○ Drift: no Claude Code work in the last ${d.days} days, so nothing to measure.`;
+  return '  ○ Drift: could not be read this time. No number shown.';
+}
+
 // What the "other models" section needs beyond the repricing: the plan paid for (if detected), billing months over the
-// logged window, and the drift headline when a stated plan is found and computes locally (about 2 seconds).
-function vsContext(claudeDir, rp) {
+// logged window, and the drift headline when a written plan was found.
+function vsContext(rp, drift) {
   const plan = readPlan(flags.plan);
   const dates = rp.dailyCum.dates;
   const months = dates.length ? monthsBilled(dates[0], dates[dates.length - 1], plan?.since) : 1;
-  let driftPct = null;
-  try {
-    const t0 = Date.now();
-    const days = flags.days === 30 ? 7 : flags.days;
-    const drift = runDrift(claudeDir, { days });
-    if (drift.available && drift.source?.planNames?.length) driftPct = Math.round(drift.share * 100);
-    console.log(driftPct != null ? `  ✓ Drift: ${driftPct}% of your last ${days} days on what you said you'd do (${((Date.now() - t0) / 1000).toFixed(1)}s)` : '  ○ No stated plan found, so no drift line');
-  } catch { driftPct = null; }
+  const driftPct = drift.state === 'ok' ? Math.round(drift.drift.share * 100) : null;
   return { plan, months, driftPct };
 }
 
@@ -326,45 +316,15 @@ async function vsJsonMode(claudeDir) {
   process.stdout.write(JSON.stringify(rp, null, 2) + '\n');
 }
 
-async function driftMode(claudeDir) {
+async function driftJsonMode(claudeDir) {
   const days = flags.days === 30 ? 7 : flags.days; // 7-day week by default; --days overrides
-  // Progress goes to stderr so `--drift --json` emits clean JSON on stdout
-  const log = flags.json ? (m) => process.stderr.write(m + '\n') : (m) => console.log(m);
-
-  log(`
-    /\\  _  /\\
-   /  \\(_)/  \\   CC Hubber v${VERSION} — Drift Report
-   \\  / ~ \\  /   How much of your week went to what you said you'd do.
-    \\/  ·  \\/
-  `);
-  log(`  Reading the last ${days} days of local sessions...\n`);
-
+  process.stderr.write(`  Reading the last ${days} days of local sessions...\n`);
   const drift = runDrift(claudeDir, { days });
-
   if (!drift.available) {
     console.error('  ✗ No agent work found in the window. Use Claude Code (or Codex) this week, then try again.\n');
     process.exit(1);
   }
-
-  const pct = Math.round(drift.share * 100);
-  log(`  ✓ ${drift.totals.prompts} prompts across ${drift.totals.sessions} sessions (${drift.inputs.claude} Claude${drift.inputs.codex ? `, ${drift.inputs.codex} Codex` : ''})`);
-  log(`  ✓ What you said you'd do: ${drift.source.planNames.length ? drift.source.planNames.join(' + ') : 'your first ask of each session'}`);
-  if (!drift.inputs.codexPresent) log('  ○ No Codex sessions found (skipped)');
-  log(`\n  ${pct}% of your agent time went to what you said you'd do.`);
-  log(`  ${Math.round(drift.totals.onMs / 3600000)}h on plan · ${Math.round(drift.totals.detourMs / 3600000)}h on detours\n`);
-  for (const d of drift.detours.slice(0, 5)) {
-    const label = flags.redact ? d.category : (d.name || d.category);
-    log(`    · ${label}  ${Math.max(1, Math.round(d.ms / 60000))}m`);
-  }
-  log('');
-
-  if (flags.json) { process.stdout.write(JSON.stringify(drift, null, 2) + '\n'); return; }
-
-  const outPath = flags.output || join(process.cwd(), 'cchubber-drift.html');
-  writeFileSync(outPath, renderDrift(drift, { redact: flags.redact }), 'utf-8');
-  log(`  ✓ Card saved to: ${outPath}`);
-  log('  ○ It stayed on this machine. Nothing was uploaded.' + (flags.redact ? '' : ' Use --redact to hide detour names.'));
-  if (!flags.noOpen) { openInBrowser(outPath); log('  ✓ Opened in browser\n'); }
+  process.stdout.write(JSON.stringify(drift, null, 2) + '\n');
 }
 
 function openInBrowser(filePath, hash = '') {
