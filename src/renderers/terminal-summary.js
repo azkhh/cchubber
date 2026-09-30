@@ -1,3 +1,5 @@
+import { usd0, low, high } from './vs-text.js';
+
 // ANSI color codes
 const c = {
   reset: '\x1b[0m',
@@ -60,4 +62,12 @@ export function renderTerminal(report) {
       console.log(`    ${icon} ${r.title}${savings}`);
     }
   }
+}
+
+
+/** The one line after the usual summary: the cheapest and the dearest bill, computed from the reprice object. */
+export function vsOneLiner(rp) {
+  if (!rp || !rp.models || rp.models.length < 2) return null;
+  const lo = low(rp), hi = high(rp);
+  return `On other models: ${lo.label} ${usd0(lo.total)} to ${hi.label} ${usd0(hi.total)}. The race and a card to post are in your report.`;
 }

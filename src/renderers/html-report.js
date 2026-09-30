@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { renderVsBlock } from './vs-report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8')).version;
@@ -10,7 +11,7 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-export function renderHTML(report) {
+export function renderHTML(report, opts = {}) {
   const { costAnalysis, cacheHealth, anomalies, inflection, sessionIntel, modelRouting, projectBreakdown, claudeMdStack, oauthUsage, recommendations, generatedAt } = report;
 
   const dailyCosts = costAnalysis.dailyCosts || [];
@@ -32,6 +33,9 @@ export function renderHTML(report) {
     name: p.name, path: p.path, messages: p.messageCount, sessions: p.sessionCount,
     input: p.inputTokens, output: p.outputTokens, cacheRead: p.cacheReadTokens, cacheWrite: p.cacheCreationTokens,
   })));
+
+  // "Your usage on other models": the race, the facts and the card buttons, right under the grade card.
+  const vsBlock = report.reprice && report.reprice.models && report.reprice.models.length ? renderVsBlock(report.reprice, opts.vs || {}) : '';
 
   const fmtCost = (n) => '$' + (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(2));
   const fmtDuration = (m) => m >= 120 ? Math.round(m/60) + 'h' : m >= 60 ? (m/60).toFixed(1) + 'h' : m + 'm';
@@ -304,6 +308,8 @@ export function renderHTML(report) {
     </button>
   </div>
 </section>
+
+${vsBlock}
 
 ${inflection && inflection.multiplier >= 1.5 ? `
 <!-- Inflection callouts -->

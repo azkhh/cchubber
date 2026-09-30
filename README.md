@@ -32,6 +32,13 @@ A single HTML report that tells you three things: what you spent, why you spent 
 - CLAUDE.md section-by-section analysis with per-message cost impact
 - Cache break estimation even when diff files don't exist on your CC version
 
+**Your usage on other models:**
+Right under the grade card, the report reprices your own tokens on every current frontier model's list price (Claude Fable 5.1, Opus 5.5, Sonnet 5.5, GPT-6 Astra and Sol, Gemini 4 Argon, DeepSeek V4 Pro, Kimi K3) and replays your real days as a six-second race. It also shows how many tokens Claude read for every token it wrote, what you paid (when your plan is detected), and, when you have a written plan, how much of your last week went to it (computed locally). Buttons download a 1200x675 card, copy the text, or open a pre-filled post on X. You click; the page never posts. No flag needed, it is part of `npx cchubber`. `--json` includes it as `reprice`.
+
+- **Sources:** prices come live from [LiteLLM](https://github.com/BerriAI/litellm)'s `model_prices_and_context_window.json`, fetched on each run. A model LiteLLM does not list yet (today Gemini 4 Argon, priced from [blog.google](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/), checked 30 Sep 2026, introductory price with the later price shown too) comes from `src/data/price-overrides.js`, used only while LiteLLM has no entry, so live data wins the day it adds the model. Offline, bundled prices dated 30 Sep 2026 are used and the report says so.
+- **Gaps:** where a provider lists no cache-read price, the input price is used (no discount assumed); where it lists no cache-write price, or zero, cache writes are billed as input. The report names which models that touched.
+- **Fine print:** same tokens on each model's list price, cache included. Another model would use a different number of tokens, so this compares prices, not outcomes.
+
 **The shareable card:**
 An animated card with your grade, spend, cache ratio, and diagnosis line. Export as video. Post it. Let people see the numbers Anthropic won't show them.
 

@@ -5,7 +5,7 @@ import { existsSync, writeFileSync } from 'fs';
 import { homedir, platform } from 'os';
 import { exec } from 'child_process';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,7 +18,8 @@ import { readSessionMeta } from '../readers/session-meta.js';
 import { readCacheBreaks } from '../readers/cache-breaks.js';
 import { readClaudeMdStack } from '../readers/claude-md.js';
 import { readOAuthUsage } from '../readers/oauth-usage.js';
-import { analyzeUsage, fetchPricing } from '../analyzers/cost-calculator.js';
+import { analyzeUsage, fetchPricing, getLiteLLMRaw } from '../analyzers/cost-calculator.js';
+import { reprice } from '../analyzers/reprice.js';
 import { analyzeCacheHealth } from '../analyzers/cache-health.js';
 import { detectAnomalies } from '../analyzers/anomaly-detector.js';
 import { generateRecommendations } from '../analyzers/recommendations.js';
@@ -27,9 +28,9 @@ import { analyzeSessionIntelligence } from '../analyzers/session-intelligence.js
 import { analyzeModelRouting } from '../analyzers/model-routing.js';
 import { analyzeValueTrend } from '../analyzers/value-tracker.js';
 import { renderHTML } from '../renderers/html-report.js';
-import { renderTerminal } from '../renderers/terminal-summary.js';
+import { renderTerminal, vsOneLiner } from '../renderers/terminal-summary.js';
 import { renderS1 } from '../renderers/s1-report.js';
-import { readPlan } from '../readers/plan.js';
+import { readPlan, monthsBilled } from '../readers/plan.js';
 import { runDrift } from '../analyzers/drift-run.js';
 import { renderDrift } from '../renderers/drift-report.js';
 import { shouldSendTelemetry, sendTelemetry } from '../telemetry.js';
@@ -43,6 +44,7 @@ const flags = {
   noOpen: args.includes('--no-open'),
   s1: args.includes('--s1'),
   drift: args.includes('--drift'),
+  vs: args.includes('--vs'),
   redact: args.includes('--redact'),
   showProject: args.includes('--show-project'),
   name: (() => { const i = args.indexOf('--name'); return i !== -1 && args[i + 1] ? args[i + 1] : null; })(),
@@ -72,7 +74,7 @@ if (flags.help) {
     --days, -d <n>     Analyze last N days (default: 30)
     --output, -o <path> Output HTML report to custom path
     --no-open          Don't auto-open the report in browser
-    --json             Output raw analysis as JSON
+    --json             Output raw analysis as JSON (includes reprice: your usage on other models)
     --s1               Your usage as an IPO prospectus (parody)
     --name <name>      Company name on the S-1 (default: You)
     --plan <usd>       Monthly plan price, if it can't be detected
@@ -89,6 +91,17 @@ if (flags.help) {
     cchubber --drift            How much of your week went to the plan
     cchubber --drift --redact   Same, with detour names hidden
 
+  Your usage on other models needs no flag. The report that cchubber opens has
+  a section for it: your own tokens repriced on each frontier model's list
+  price, a race built from your real days, and buttons to download a card, copy
+  the text or post it on X. Prices come live from LiteLLM, plus a manual entry
+  for a listed model LiteLLM does not carry yet (used only until LiteLLM has
+  it). Offline it uses bundled prices dated 30 Sep 2026. When a plan you wrote
+  down is found (plan.md or similar) the section also shows how much of your
+  last week went to it, computed locally.
+  Same tokens on each model's list price, cache included. Another model would
+  use a different number of tokens, so this compares prices, not outcomes.
+
   Shipped with Mover OS at speed.
   https://moveros.dev
 `);
@@ -103,6 +116,10 @@ async function main() {
     console.error('    Make sure Claude Code is installed and has been used at least once.\n');
     process.exit(1);
   }
+
+  // Hidden, for scripts: `--vs --json` prints only the repricing (no report work). Plain `--vs` is an alias of the normal
+  // run that opens the report scrolled to its "Your usage on other models" section. Nothing needs the flag.
+  if (flags.vs && flags.json) return vsJsonMode(claudeDir);
 
   // Drift report: its own local pipeline (last week of sessions vs your stated plan). No cost reading, no network.
   if (flags.drift) return driftMode(claudeDir);
@@ -178,6 +195,14 @@ async function main() {
   if (communityStats) console.log(`  ✓ Community data: ${communityStats.totalReports} users from ${Object.keys(communityStats.countries || {}).length} countries`);
   else console.log('  ○ Community data unavailable (offline)');
 
+  // Your usage on other models. Never allowed to break the normal run.
+  let vsData = null;
+  try {
+    const live = getLiteLLMRaw();
+    vsData = reprice(costAnalysis, { raw: live?.data, fetchedAt: live?.fetchedAt });
+    console.log(vsData.offline ? '  ○ Other-model prices offline: bundled prices as of 30 Sep 2026' : '  ✓ Other-model prices: LiteLLM');
+  } catch { vsData = null; }
+
   const report = {
     generatedAt: new Date().toISOString(),
     periodDays: flags.days,
@@ -193,6 +218,7 @@ async function main() {
     recommendations,
     valueTrend,
     communityStats,
+    reprice: vsData,
     history: getHistory(),
   };
 
@@ -219,6 +245,9 @@ async function main() {
 
   renderTerminal(report);
 
+  // One line on what the same tokens would cost elsewhere; the rest is in the report.
+  try { const line = vsOneLiner(vsData); if (line) console.log(`\n  ${line}`); } catch {}
+
   // Anonymous telemetry (opt out: --no-telemetry or CC_HUBBER_TELEMETRY=0)
   if (shouldSendTelemetry(flags)) {
     console.log('  ○ Sharing anonymous stats...');
@@ -237,19 +266,60 @@ async function main() {
   }
 
   const outputPath = flags.output || join(process.cwd(), 'cchubber-report.html');
-  const html = renderHTML(report);
+  const vsCtx = vsData ? vsContext(claudeDir, vsData) : null;
+  const html = renderHTML(report, { vs: vsCtx });
   writeFileSync(outputPath, html, 'utf-8');
   console.log(`\n  ✓ Report saved to: ${outputPath}`);
 
   if (!flags.noOpen) {
-    openInBrowser(outputPath);
+    openInBrowser(outputPath, flags.vs ? 'vs' : '');
     console.log('  ✓ Opened in browser\n');
   }
+}
+
+// What the "other models" section needs beyond the repricing: the plan paid for (if detected), billing months over the
+// logged window, and the drift headline when a stated plan is found and computes locally (about 2 seconds).
+function vsContext(claudeDir, rp) {
+  const plan = readPlan(flags.plan);
+  const dates = rp.dailyCum.dates;
+  const months = dates.length ? monthsBilled(dates[0], dates[dates.length - 1]) : 1;
+  let driftPct = null;
+  try {
+    const t0 = Date.now();
+    const days = flags.days === 30 ? 7 : flags.days;
+    const drift = runDrift(claudeDir, { days });
+    if (drift.available && drift.source?.planNames?.length) driftPct = Math.round(drift.share * 100);
+    console.log(driftPct != null ? `  ✓ Drift: ${driftPct}% of your last ${days} days on what you said you'd do (${((Date.now() - t0) / 1000).toFixed(1)}s)` : '  ○ No stated plan found, so no drift line');
+  } catch { driftPct = null; }
+  return { plan, months, driftPct };
 }
 
 function getClaudeDir() {
   const home = homedir();
   return join(home, '.claude');
+}
+
+async function vsJsonMode(claudeDir) {
+  // Progress goes to stderr so stdout is clean JSON
+  const log = (m) => process.stderr.write(m + '\n');
+  log('  Reading local Claude Code data...');
+
+  const jsonlEntries = readAllJSONL(claudeDir);
+  const statsCache = readStatsCache(claudeDir);
+  if (jsonlEntries.length === 0 && !statsCache) {
+    console.error('  ✗ No usage data found. Use Claude Code first, then run CC Hubber.\n');
+    process.exit(1);
+  }
+  const sessionMeta = readSessionMeta(claudeDir);
+  const dailyFromJSONL = aggregateDaily(jsonlEntries);
+  const modelFromJSONL = aggregateByModel(jsonlEntries);
+
+  await fetchPricing();
+  const live = getLiteLLMRaw();
+  const costAnalysis = analyzeUsage(statsCache, sessionMeta, 99999, dailyFromJSONL, modelFromJSONL);
+  const rp = reprice(costAnalysis, { raw: live?.data, fetchedAt: live?.fetchedAt });
+  log(rp.offline ? '  ○ Offline: prices as of 30 Sep 2026 (bundled)' : '  ✓ Live prices from LiteLLM');
+  process.stdout.write(JSON.stringify(rp, null, 2) + '\n');
 }
 
 async function driftMode(claudeDir) {
@@ -293,11 +363,13 @@ async function driftMode(claudeDir) {
   if (!flags.noOpen) { openInBrowser(outPath); log('  ✓ Opened in browser\n'); }
 }
 
-function openInBrowser(filePath) {
+function openInBrowser(filePath, hash = '') {
   const p = platform();
-  const cmd = p === 'win32' ? `start "" "${filePath}"`
-    : p === 'darwin' ? `open "${filePath}"`
-    : `xdg-open "${filePath}"`;
+  // A file URL lets the browser scroll to a #section; a bare path cannot carry one.
+  const target = hash ? `${pathToFileURL(filePath).href}#${hash}` : filePath;
+  const cmd = p === 'win32' ? `start "" "${target}"`
+    : p === 'darwin' ? `open "${target}"`
+    : `xdg-open "${target}"`;
   exec(cmd, (err) => { if (err) console.log('  ○ Could not auto-open browser. Open the file manually.'); });
 }
 
