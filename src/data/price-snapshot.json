@@ -1,0 +1,49 @@
+{
+  "date": "2026-09-30",
+  "source": "LiteLLM model_prices_and_context_window.json",
+  "note": "USD per million tokens as LiteLLM lists them; null means the field is absent (reprice.js fills it from the input price).",
+  "models": {
+    "claude-fable-5-1": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 0.25,
+      "cacheWrite": 12.5
+    },
+    "claude-opus-5-5": {
+      "input": 4,
+      "output": 20,
+      "cacheRead": 0.2,
+      "cacheWrite": 5
+    },
+    "claude-sonnet-5-5": {
+      "input": 2,
+      "output": 10,
+      "cacheRead": 0.2,
+      "cacheWrite": 2.5
+    },
+    "gpt-6-astra": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 1,
+      "cacheWrite": 12.5
+    },
+    "gpt-6-sol": {
+      "input": 2,
+      "output": 10,
+      "cacheRead": 0.2,
+      "cacheWrite": 2.5
+    },
+    "deepseek-v4-pro": {
+      "input": 1.32,
+      "output": 3.96,
+      "cacheRead": 0.044,
+      "cacheWrite": 0
+    },
+    "moonshot/kimi-k3": {
+      "input": 3,
+      "output": 15,
+      "cacheRead": 0.3,
+      "cacheWrite": null
+    }
+  }
+}

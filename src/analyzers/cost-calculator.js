@@ -13,6 +13,14 @@ const FALLBACK_PRICING = {
 
 // Dynamic pricing cache (populated by fetchPricing)
 let dynamicPricing = null;
+// The whole LiteLLM JSON (every provider) from that same fetch, kept for --vs. Null when the fetch failed.
+let rawLiteLLM = null;
+let rawFetchedAt = null;
+
+/** The raw LiteLLM table and when it was fetched, or null when offline. Call after fetchPricing(). */
+export function getLiteLLMRaw() {
+  return rawLiteLLM ? { data: rawLiteLLM, fetchedAt: rawFetchedAt } : null;
+}
 
 /**
  * Fetch latest pricing from LiteLLM. Returns map of model -> pricing.
@@ -36,6 +44,7 @@ export async function fetchPricing() {
 
     // Parse LiteLLM format into our format
     const pricing = {};
+    const fetchedAt = Date.now();
     for (const [key, info] of Object.entries(data)) {
       if (!key.startsWith('claude') && !key.includes('claude')) continue;
 
@@ -52,6 +61,8 @@ export async function fetchPricing() {
 
     if (Object.keys(pricing).length > 0) {
       dynamicPricing = pricing;
+      rawLiteLLM = data;
+      rawFetchedAt = fetchedAt;
       return pricing;
     }
   } catch {
