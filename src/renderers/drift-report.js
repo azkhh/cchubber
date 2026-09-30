@@ -58,6 +58,23 @@ const CSS = `
 #drift .dr-side h4{margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
 #drift .dr-side p{margin:0; font-size:16px; line-height:1.5; color:var(--dim)}
 #drift .dr-side p b{color:var(--ink); font-weight:700}
+#drift .dr-tools{display:flex; align-items:center; gap:12px 14px; flex-wrap:wrap; margin:0 0 16px}
+#drift .dr-btn{appearance:none; font:inherit; font-size:13px; font-weight:700; cursor:pointer; color:var(--ink); background:rgba(255,255,255,.05);
+  border:1px solid rgba(70,69,84,.45); border-radius:8px; padding:8px 14px; min-height:40px}
+#drift .dr-btn:hover{background:#292a2b}
+#drift .dr-btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+#drift .dr-btn[aria-pressed="true"]{background:rgba(192,193,255,.14); border-color:rgba(192,193,255,.4)}
+#drift .dr-hint{font-size:12px; color:var(--faint); flex:1 1 220px}
+#drift:not(.dr-hidden) .dr-c{display:none}
+#drift.dr-hidden .dr-w{display:none}
+#drift .dr-days{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px}
+#drift .dr-day{display:grid; grid-template-columns:84px minmax(40px,1fr) 196px; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--line); font-size:13px}
+#drift .dr-day:last-child{border-bottom:0}
+#drift .dd{color:var(--ink); font-weight:600}
+#drift .db{height:8px; border-radius:6px; background:rgba(255,255,255,.05); display:flex; overflow:hidden}
+#drift .db i{display:block; height:100%}
+#drift .db .on{background:var(--on)} #drift .db .off{background:var(--off)}
+#drift .dh{font-family:var(--mono); font-size:12px; color:var(--dim); text-align:right; white-space:nowrap}
 #drift .dr-side .dr-small{font-size:13px; line-height:1.6; color:var(--faint)}
 #drift .dr-empty{background:var(--card); border:1px solid rgba(70,69,84,.15); border-radius:12px; padding:24px 28px; max-width:760px}
 #drift .dr-empty p{margin:0 0 12px; font-size:16px; line-height:1.55; color:var(--dim)}
@@ -113,6 +130,10 @@ const CSS = `
   #drift .card{width:100%; max-width:420px; margin:0 auto}
   #drift .dr-side{padding-top:0}
 }
+@media (max-width:480px){
+  #drift .dr-day{grid-template-columns:84px minmax(40px,1fr); row-gap:4px}
+  #drift .dh{grid-column:1 / -1; text-align:left}
+}
 @media (max-width:420px){
   #drift .num{font-size:96px}
   #drift .dr-empty{padding:18px 16px}
@@ -124,20 +145,22 @@ function cardHtml(drift, { redact }) {
   const { onMs, detourMs } = drift.totals;
   const range = rangeLabel(firstDay(drift), lastDay(drift));
 
-  // Names by default (scrubbed by drift-privacy); with --redact, categories, merged so one kind of detour is one row
-  const detours = (redact ? mergeByCategory(drift.detours) : drift.detours)
-    .slice(0, 5)
-    .map(d => ({ label: redact ? d.category : (d.name || d.category), ms: d.ms, times: d.times }));
+  // Both views are embedded so the page can swap them without a reload: detours by name, and merged by category (one kind of
+  // detour is one row). With --redact the names are not written into the file at all, only the categories.
+  const byName = drift.detours.slice(0, 5).map(d => ({ label: d.name || d.category, ms: d.ms, times: d.times }));
+  const byKind = mergeByCategory(drift.detours).slice(0, 5).map(d => ({ label: d.category, ms: d.ms, times: d.times }));
   const worst = drift.worstDay && drift.worstDay.detourMs > 0 ? drift.worstDay : null;
   const streak = drift.streak && drift.streak.ms >= 20 * MIN ? drift.streak : null;
   const agents = [drift.inputs?.claude && 'Claude Code', drift.inputs?.codex && 'Codex'].filter(Boolean).join(' + ') || 'Claude Code';
 
-  const detourRows = detours.map((d, i) => `
+  const rows = (list, cls) => `<ul class="rows ${cls}">${list.map((d, i) => `
       <li class="row" style="--i:${i}">
         <span class="dot"></span>
         <span class="rlabel">${esc(d.label)}${d.times > 1 ? `<span class="rtimes">&times;${d.times}</span>` : ''}</span>
         <span class="rtime">${hours(d.ms)}</span>
-      </li>`).join('');
+      </li>`).join('')}</ul>`;
+  const detourRows = (redact ? '' : rows(byName, 'dr-w')) + rows(byKind, 'dr-c');
+  const streakName = (redact ? '' : `<span class="fs dr-w">${esc(streak?.name || streak?.category)}</span>`) + `<span class="fs dr-c">${esc(streak?.category)}</span>`;
 
   return `
   <article class="card" id="card" role="img" aria-label="Drift report: ${pct}% of agent time on plan">
@@ -159,15 +182,15 @@ function cardHtml(drift, { redact }) {
       </div>
     </div>
 
-    ${detours.length ? `
+    ${byKind.length ? `
     <section class="block">
       <h2>Where the rest went</h2>
-      <ul class="rows">${detourRows}</ul>
+      ${detourRows}
     </section>` : ''}
 
     <section class="facts">
       ${worst ? `<div class="fact"><span class="fk">Drifted most</span><span class="fv">${esc(weekday(worst.day))}</span><span class="fs">${Math.round(worst.share * 100)}% off plan</span></div>` : ''}
-      ${streak ? `<div class="fact"><span class="fk">Longest rabbit hole</span><span class="fv">${hours(streak.ms)}</span><span class="fs">${redact ? esc(streak.category) : esc(streak.name || streak.category)}</span></div>` : ''}
+      ${streak ? `<div class="fact"><span class="fk">Longest rabbit hole</span><span class="fv">${hours(streak.ms)}</span>${streakName}</div>` : ''}
     </section>
 
     <p class="kick">${esc(kicker(drift.share || 0, drift))}</p>
@@ -192,6 +215,21 @@ const EMPTY = {
     <p><b>Drift could not be read on this machine this time, so no number is shown.</b></p>
     <p>Run cchubber again. Your last ${d} days are read from your own Claude Code folder and nothing is uploaded.</p>`,
 };
+
+// The days drift already measured, oldest first, with hours on plan and on detours. Days with no agent work are left out.
+function dayList(drift) {
+  const days = (drift.days || []).filter(d => d.onMs + d.detourMs > 0);
+  if (!days.length) return '';
+  const busiest = Math.max(...days.map(d => d.onMs + d.detourMs));
+  const items = days.map(d => `
+        <li class="dr-day"><span class="dd">${esc(weekday(d.day).slice(0, 3))} ${esc(dateShort(d.day))}</span>
+          <span class="db" aria-hidden="true"><i class="on" style="width:${(d.onMs / busiest * 100).toFixed(1)}%"></i><i class="off" style="width:${(d.detourMs / busiest * 100).toFixed(1)}%"></i></span>
+          <span class="dh">${hours(d.onMs)} on plan &middot; ${hours(d.detourMs)} off</span></li>`).join('');
+  return `<div>
+        <h4>Day by day</h4>
+        <ul class="dr-days">${items}</ul>
+      </div>`;
+}
 
 /**
  * The drift section of the plain report. `state` comes from driftForReport: { state, days, drift }.
@@ -221,7 +259,8 @@ export function renderDriftSection(state, { redact = false } = {}) {
         <h4>What was measured</h4>
         <p><b>${esc(t.prompts)}</b> prompts across <b>${esc(t.sessions)}</b> sessions (${esc(agents)}) in the last ${days} days. Work that matched your plan counts as on plan; everything else is a detour.</p>
       </div>
-      <p class="dr-small">Everything ran on this machine. Nothing was uploaded. The method is rough: it reads your words and the files touched, so it will miscall the odd one.${redact ? '' : ' Detour names are your own words with paths, keys and links removed; run with --redact to show categories only.'}</p>
+      ${dayList(d)}
+      <p class="dr-small">Everything ran on this machine. Nothing was uploaded. The method is rough: it reads your words and the files touched, so it will miscall the odd one. ${redact ? 'Detour names are hidden in this file.' : 'Detour names are short labels from your own words (paths, keys and links removed) or from the folder the work touched.'}</p>
     </div>
   </div>`;
   } else {
@@ -231,11 +270,20 @@ export function renderDriftSection(state, { redact = false } = {}) {
   return `
 <!-- DRIFT: your last week against what you said you'd do -->
 <style>${CSS}</style>
-<section id="drift" aria-label="Your week against your plan">
+<section id="drift" class="${redact ? 'dr-hidden' : ''}" aria-label="Your week against your plan">
   <div class="dr-head"><h3 class="dr-title">Your week against your plan</h3><span class="dr-range">${esc(range)}</span></div>
+  ${ok && !redact ? `<p class="dr-tools"><button type="button" class="dr-btn" id="dr-hide" aria-pressed="false">Hide my words</button><span class="dr-hint" id="dr-hint">For sharing a screenshot: swaps every detour name for its kind.</span></p>` : ''}
   ${body}
 </section>
-<script id="dr-js">(function(){ if (location.hash === '#drift') window.addEventListener('load', function(){ setTimeout(function(){ var s = document.getElementById('drift'); if (s) s.scrollIntoView(); }, 60); }); })();</script>
+<script id="dr-js">(function(){
+  var box = document.getElementById('drift'), btn = document.getElementById('dr-hide');
+  if (btn) btn.addEventListener('click', function(){
+    var hidden = box.classList.toggle('dr-hidden');
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    btn.textContent = hidden ? 'Show my words' : 'Hide my words';
+  });
+  if (location.hash === '#drift') window.addEventListener('load', function(){ setTimeout(function(){ box.scrollIntoView(); }, 60); });
+})();</script>
 `;
 }
 

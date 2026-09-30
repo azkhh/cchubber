@@ -23,7 +23,7 @@ export function runDrift(claudeDir, { days = 7, until = Date.now(), codexDir = d
 
   return {
     ...drift,
-    days,
+    windowDays: days,   // the length of the window; drift.days is the day-by-day list and must not be overwritten
     inputs: {
       claude: sessions.filter(s => s.agent === 'claude').length,
       codex: sessions.filter(s => s.agent === 'codex').length,

@@ -1,4 +1,5 @@
-import { shortName, categorize } from './drift-privacy.js';
+import { shortName, categorize, labelName } from './drift-privacy.js';
+import { homedir } from 'os';
 
 /**
  * Drift: how much of your agent time went to what you said you'd do.
@@ -319,6 +320,11 @@ export function analyzeDrift(sessions, { since, until = Date.now(), planFor = ()
   return summarize({ turns, human, detours, since, until, idf, sources, planNames, scopes: [...scopes], planNotes });
 }
 
+// What a run of turns touched, for naming a detour whose own words do not make a readable label
+function touchedBy(turns) {
+  return { files: turns.flatMap(t => [...(t.topicFiles || t.files || [])]), cwd: turns[0]?.cwd || '', home: homedir() };
+}
+
 function summarize({ turns, human, detours, since, until, idf, sources, planNames, scopes, planNotes }) {
   const counted = turns.filter(t => t.time && t.time.ms > 0 && (t.label === 'on' || t.label === 'detour'));
   const onMs = counted.filter(t => t.label === 'on').reduce((a, t) => a + t.time.ms, 0);
@@ -379,7 +385,7 @@ function summarize({ turns, human, detours, since, until, idf, sources, planName
     wallMs: longest.end - longest.start,
     start: longest.start,
     detours: longest.turns.filter(t => t.thread && t.thread.head === t).length,
-    name: shortName(longest.best.text),
+    name: labelName(longest.best.text, touchedBy(longest.turns), categorize(longest.turns.map(t => t.text).join(' '))),
     category: categorize(longest.turns.map(t => t.text).join(' ')),
   } : null;
 
@@ -397,13 +403,23 @@ function summarize({ turns, human, detours, since, until, idf, sources, planName
       clusters.push({ best: e.best, bag: own, ms: e.ms, episodes: [e] });
     }
   }
-  const named = clusters.map(c => ({
-    name: shortName(c.best.text),
+  // Two detours that end up with the same label (several fall back to "code") are one row
+  const mergeSame = (list) => {
+    const by = new Map();
+    for (const d of list) {
+      const k = d.name;
+      const c = by.get(k);
+      if (c) { c.ms += d.ms; c.times += d.times; c.first = Math.min(c.first, d.first); } else by.set(k, { ...d });
+    }
+    return [...by.values()];
+  };
+  const named = mergeSame(clusters.map(c => ({
+    name: labelName(c.best.text, touchedBy(c.episodes.flatMap(e => e.turns)), categorize(c.episodes.map(e => e.best.text).join(' '))),
     category: categorize(c.episodes.map(e => e.best.text).join(' ')),
     ms: c.ms,
     times: c.episodes.length,
     first: Math.min(...c.episodes.map(e => e.start)),
-  })).filter(d => d.name).sort((a, b) => b.ms - a.ms);
+  })).filter(d => d.name)).sort((a, b) => b.ms - a.ms);
 
   const active = new Set(counted.map(t => t.session));
   const inSpan = human.filter(t => t.t >= since && t.t <= until);
