@@ -11,7 +11,6 @@ npx cchubber
 
 Reads your local data, generates an HTML report. No API keys, no accounts. Sends anonymous stats for community benchmarks ([details](#telemetry)). Opt out: `--no-telemetry`.
 
-Built during the March 2026 cache crisis because nobody could tell if they'd been hit. Thousands of users burning through limits 10-20x faster than normal, and Anthropic's only answer was "we're investigating." We wanted receipts.
 
 ## What you get
 
